@@ -19,8 +19,11 @@ Unlike workflows that require a `raw/` + `wiki/` layout, the current implementat
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/kb-init`    | Initialize a knowledge base directory, create `wiki/`, `outputs/`, `CLAUDE.md`, and starter indexes, and auto-compile existing material when present                            |
 | `/kb-compile` | Read source material from the KB root, create or update structured wiki articles, and maintain `_index.md`, `_glossary.md`, and `_recent.md`                                    |
-| `/kb-qa`      | Answer questions against the wiki, fall back to source files when coverage is insufficient, save answers to `outputs/answers/`, and optionally file insights back into the wiki |
+| `/kb-qa`      | Answer questions against the wiki, reuse `/kb-search`'s TF-IDF index to shortlist relevant articles, fall back to source files when coverage is insufficient, save answers to `outputs/answers/`, and optionally file insights back into the wiki |
 | `/kb-lint`    | Run health checks, identify orphan articles, broken wikilinks, stale content, and uncovered sources, save a report to `outputs/lint-report.md`, and auto-fix safe issues        |
+| `/kb-slides`  | Generate Marp-format slide decks from wiki content, save to `outputs/slides/`, viewable in Obsidian with the Marp plugin                                                       |
+| `/kb-viz`     | Generate matplotlib charts and diagrams from wiki data, save to `outputs/images/`, embeddable in wiki articles                                                                  |
+| `/kb-search`  | Full-text search across the wiki using a TF-IDF inverted index, usable directly or as a retrieval accelerator for `/kb-qa` and larger LLM queries                              |
 
 
 ## Design Principles
@@ -52,7 +55,7 @@ cd llm-notes
 ./install.sh
 ```
 
-`install.sh` symlinks the skills in this repository into `~/.claude/skills/`, making `/kb-init`, `/kb-compile`, `/kb-qa`, and `/kb-lint` available globally inside Claude Code.
+`install.sh` symlinks the skills in this repository into `~/.claude/skills/`, making `/kb-init`, `/kb-compile`, `/kb-qa`, `/kb-lint`, `/kb-slides`, `/kb-viz`, and `/kb-search` available globally inside Claude Code.
 
 ## Quick Start
 
@@ -100,6 +103,43 @@ Use this when you want to build a new knowledge base from scratch:
 /kb-qa "What topics have emerged in the knowledge base so far?"
 ```
 
+### Generate Slides From Wiki Content
+
+```bash
+/kb-slides "Introduction to Transformer Architecture"
+# -> outputs/slides/2026-04-11-intro-transformers.md (Marp format)
+# View in Obsidian with Marp plugin, or export: marp --pdf outputs/slides/*.md
+```
+
+### Visualize Data From Wiki
+
+```bash
+/kb-viz "Compare parameter counts across model architectures"
+# -> outputs/images/2026-04-11-model-params.png
+# Embed in wiki: ![[outputs/images/2026-04-11-model-params.png]]
+```
+
+### Search The Wiki
+
+```bash
+/kb-search "attention mechanism"
+# -> Ranked results with TF-IDF scoring and snippet previews
+# -> The same index can be reused by /kb-qa to narrow the reading set before synthesis
+```
+
+### Full Research Loop
+
+A complete workflow combining all skills:
+
+```bash
+/kb-init .                           # Initialize and auto-compile
+/kb-qa "What are the key findings?"  # Ask questions, file answers back
+/kb-slides "Summary of findings"     # Generate a presentation
+/kb-viz "Timeline of key events"     # Create a visualization
+/kb-lint                             # Check health, get exploration suggestions
+/kb-compile                          # Re-compile after adding new material
+```
+
 ## Generated Knowledge Base Layout
 
 ```text
@@ -129,7 +169,10 @@ llm-notes/
 │   ├── kb-init/
 │   ├── kb-compile/
 │   ├── kb-qa/
-│   └── kb-lint/
+│   ├── kb-lint/
+│   ├── kb-slides/
+│   ├── kb-viz/
+│   └── kb-search/
 ├── install.sh
 ├── README.md
 └── README.zh-CN.md
@@ -147,4 +190,3 @@ llm-notes/
 - [LLM Knowledge Bases](https://x.com/karpathy/status/2039805659525644595)
 - [graphify README](https://github.com/safishamsi/graphify/blob/v4/README.md)
 - [WikiLLM README](https://github.com/wang-junjian/wikillm/blob/main/README.md)
-

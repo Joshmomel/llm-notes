@@ -1,15 +1,18 @@
 ---
 name: kb-qa
-version: 0.1.1
+version: 0.1.2
 description: |
-  Ask questions against the knowledge base wiki. Navigates indexes,
-  reads relevant articles, synthesizes answers with citations,
-  surfaces gaps and follow-up questions, saves to outputs/,
-  and optionally files insights back into the wiki.
+  Ask questions against the knowledge base wiki. Reuses the wiki
+  full-text search index when available to shortlist candidate
+  articles, then navigates indexes, reads relevant articles,
+  synthesizes answers with citations, surfaces gaps and follow-up
+  questions, saves to outputs/, and optionally files insights back
+  into the wiki.
 allowed-tools:
   - Read
   - Write
   - Edit
+  - Bash
   - Glob
   - Grep
 trigger: /kb-qa
@@ -35,12 +38,17 @@ Find the nearest directory containing `wiki/`. If not found, tell the user to ru
 
 Follow the navigation protocol to find relevant content:
 
-1. **Read `wiki/_index.md`** — identify relevant categories
-2. **Read category `_index.md` files** — identify specific articles (read 1-3 category indexes)
-3. **Read relevant articles** — read 3-10 articles that relate to the question
-4. **Check source files if needed** — if wiki coverage is insufficient, read KB-root files directly while excluding `wiki/`, `outputs/`, hidden dirs, `CLAUDE.md`, and `.gitignore`
-5. **Note gaps** — track any topics the wiki doesn't cover well
-6. **Note next questions** — track concrete follow-up questions opened up by the evidence, contradictions, or missing coverage
+1. **Read `wiki/_index.md`** — identify relevant categories and distill likely search terms
+2. **Reuse the `/kb-search` search path when possible**:
+   - If `wiki/_search.py` is missing, create it using the same script contract as `/kb-search` and make it executable
+   - If `wiki/_search_index.json` is missing or older than the newest wiki article, rebuild it with `python3 wiki/_search.py index`
+   - Run `python3 wiki/_search.py search "<question keywords>"` to shortlist candidate articles
+   - Treat search as a retrieval accelerator, not a substitute for reading the cited sources
+3. **Read category `_index.md` files** — confirm coverage and identify specific articles (read 1-3 category indexes)
+4. **Read relevant articles** — read 3-10 articles that relate to the question, prioritizing high-ranked search hits when available
+5. **Check source files if needed** — if wiki coverage is insufficient, read KB-root files directly while excluding `wiki/`, `outputs/`, hidden dirs, `CLAUDE.md`, and `.gitignore`
+6. **Note gaps** — track any topics the wiki doesn't cover well
+7. **Note next questions** — track concrete follow-up questions opened up by the evidence, contradictions, or missing coverage
 
 ### Step 3: Synthesize Answer
 

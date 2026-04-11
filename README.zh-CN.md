@@ -19,8 +19,9 @@
 | ------------- | ------------------------------------------------------------------------------- |
 | `/kb-init`    | 初始化知识库目录，创建 `wiki/`、`outputs/`、`CLAUDE.md` 和基础索引；如果目录已有内容，会自动编译现有材料             |
 | `/kb-compile` | 读取知识库根目录中的源材料，生成或更新结构化 wiki 文章，并维护 `_index.md`、`_glossary.md`、`_recent.md`      |
-| `/kb-qa`      | 基于现有 wiki 回答问题，在覆盖不足时回读源文件，将答案保存到 `outputs/answers/`，并可选择回填到 wiki               |
+| `/kb-qa`      | 基于现有 wiki 回答问题，优先复用 `/kb-search` 的 TF-IDF 索引召回候选文章；在覆盖不足时回读源文件，将答案保存到 `outputs/answers/`，并可选择回填到 wiki |
 | `/kb-lint`    | 执行健康检查，识别孤立文章、失效 wikilinks、过时内容和未覆盖源文件，将报告保存到 `outputs/lint-report.md`，并自动修复安全项 |
+| `/kb-search`  | 基于 TF-IDF 倒排索引对 wiki 做全文搜索；既可直接使用，也可作为 `/kb-qa` 等更大查询流程的检索加速器 |
 
 
 ## 设计原则
@@ -52,7 +53,7 @@ cd llm-notes
 ./install.sh
 ```
 
-`install.sh` 会将仓库中的 skill 目录软链接到 `~/.claude/skills/`，使 `/kb-init`、`/kb-compile`、`/kb-qa` 和 `/kb-lint` 可以在 Claude Code 中全局使用。
+`install.sh` 会将仓库中的 skill 目录软链接到 `~/.claude/skills/`，使 `/kb-init`、`/kb-compile`、`/kb-qa`、`/kb-lint`、`/kb-slides`、`/kb-viz` 和 `/kb-search` 可以在 Claude Code 中全局使用。
 
 ## 快速开始
 
@@ -147,4 +148,3 @@ llm-notes/
 - [LLM Knowledge Bases](https://x.com/karpathy/status/2039805659525644595)
 - [graphify README](https://github.com/safishamsi/graphify/blob/v4/README.md)
 - [WikiLLM README](https://github.com/wang-junjian/wikillm/blob/main/README.md)
-
