@@ -56,6 +56,13 @@ Follow the navigation protocol to find relevant content:
 ### Step 3: Synthesize Answer
 
 Write a comprehensive answer:
+- The answer body must use the same four-part skeleton every time, in this exact order:
+  1. `## Main Conclusion`
+  2. `## Knowledge Network Extension`
+  3. `## Deep-Dive Threads`
+  4. `## Further Questions`
+- If the user is writing in another language, localize the section titles, but keep the same four-section structure and order
+- Put any tables, comparisons, or richer exposition inside `## Main Conclusion`, not in place of the required skeleton
 - Use `[[wikilinks]]` to cite wiki articles inline
 - Include specific details from the articles
 - If you found conflicting information, note it
@@ -84,17 +91,9 @@ filed_to_wiki: false
 
 # <Question>
 
-<Answer with [[wikilinks]] citations>
+## Main Conclusion
 
-## Sources Consulted
-
-- [[category/article]] — what it contributed to the answer
-- [[category/other-article]] — what it contributed
-
-## Gaps Identified
-
-- Topics not covered in the wiki
-- Areas that need more research
+<Direct answer with [[wikilinks]] citations. This section can contain comparisons, tables, and synthesized judgment, but it must stay under this heading.>
 
 ## Knowledge Network Extension
 
@@ -110,7 +109,19 @@ filed_to_wiki: false
 
 - A specific follow-up question raised by the answer — why it matters
 - Another question to investigate next — what evidence would resolve it
+
+## Sources Consulted
+
+- [[category/article]] — what it contributed to the answer
+- [[category/other-article]] — what it contributed
+
+## Gaps Identified
+
+- Topics not covered in the wiki
+- Areas that need more research
 ```
+
+The short answer shown to the user in chat should mirror the same four sections, even if abbreviated.
 
 ### Step 5: Offer to File Back
 
