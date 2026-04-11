@@ -1,13 +1,14 @@
 ---
 name: kb-qa
-version: 0.1.2
+version: 0.1.3
 description: |
   Ask questions against the knowledge base wiki. Reuses the wiki
   full-text search index when available to shortlist candidate
-  articles, then navigates indexes, reads relevant articles,
-  synthesizes answers with citations, surfaces gaps and follow-up
-  questions, saves to outputs/, and optionally files insights back
-  into the wiki.
+  articles, then navigates indexes, extends the local knowledge
+  network through related links and neighboring concepts, reads
+  relevant articles, synthesizes answers with citations, surfaces
+  gaps and deep follow-up investigation threads, saves to outputs/,
+  and optionally files insights back into the wiki.
 allowed-tools:
   - Read
   - Write
@@ -20,7 +21,7 @@ trigger: /kb-qa
 
 # /kb-qa — Question Answering
 
-Ask questions against the knowledge base. Answers are synthesized from wiki articles with citations and should surface promising next questions.
+Ask questions against the knowledge base. Answers are synthesized from wiki articles with citations and should surface promising next questions, nearby concepts, and deeper investigation threads.
 
 ## Usage
 
@@ -46,9 +47,11 @@ Follow the navigation protocol to find relevant content:
    - Treat search as a retrieval accelerator, not a substitute for reading the cited sources
 3. **Read category `_index.md` files** — confirm coverage and identify specific articles (read 1-3 category indexes)
 4. **Read relevant articles** — read 3-10 articles that relate to the question, prioritizing high-ranked search hits when available
-5. **Check source files if needed** — if wiki coverage is insufficient, read KB-root files directly while excluding `wiki/`, `outputs/`, hidden dirs, `CLAUDE.md`, and `.gitignore`
-6. **Note gaps** — track any topics the wiki doesn't cover well
-7. **Note next questions** — track concrete follow-up questions opened up by the evidence, contradictions, or missing coverage
+5. **Extend the knowledge network** — from the strongest seed articles, follow relevant `[[wikilinks]]`, backlinks, sibling articles in the same category, contrasting approaches, and prerequisite concepts for 1-2 hops to map nearby concepts that materially change the answer
+6. **Track deep investigation threads** — note open loops, contradictions, edge cases, second-order implications, and unresolved comparisons worth pursuing beyond the initial answer
+7. **Check source files if needed** — if wiki coverage is insufficient, read KB-root files directly while excluding `wiki/`, `outputs/`, hidden dirs, `CLAUDE.md`, and `.gitignore`
+8. **Note gaps** — track any topics the wiki doesn't cover well
+9. **Note next questions** — track concrete follow-up questions opened up by the evidence, contradictions, missing coverage, or network expansion
 
 ### Step 3: Synthesize Answer
 
@@ -56,7 +59,10 @@ Write a comprehensive answer:
 - Use `[[wikilinks]]` to cite wiki articles inline
 - Include specific details from the articles
 - If you found conflicting information, note it
+- Distinguish the direct answer from adjacent but relevant concepts discovered during network expansion
 - If the wiki has gaps, mention what's missing
+- Include a `## Knowledge Network Extension` section with 3-7 related concepts, articles, or branches that should be traversed next, and say how each one connects to the question
+- Include a `## Deep-Dive Threads` section with 3-7 concrete investigation threads that would deepen or stress-test the answer
 - Include a `## Further Questions` section with 3-7 concrete next questions or investigation threads
 - Make the follow-up questions specific to what you learned, not generic research boilerplate
 - For each follow-up question, add a short clause about why it matters or what evidence would help answer it
@@ -90,6 +96,16 @@ filed_to_wiki: false
 - Topics not covered in the wiki
 - Areas that need more research
 
+## Knowledge Network Extension
+
+- [[category/adjacent-article]] — how it extends, reframes, or challenges the current answer
+- [[category/prerequisite-concept]] — why this concept should be traversed next
+
+## Deep-Dive Threads
+
+- A concrete thread to pursue next — what contradiction, edge case, or comparison makes it worth deeper tracking
+- Another multi-step investigation path — what evidence or source would move it forward
+
 ## Further Questions
 
 - A specific follow-up question raised by the answer — why it matters
@@ -103,7 +119,8 @@ Ask the user: "File this back into the wiki?"
 If yes:
 1. Extract key insights from the answer
 2. Create a new wiki article or enrich an existing one with the synthesized knowledge
-3. Update all indexes (`_index.md`, `_glossary.md`, `_recent.md`)
-4. Update the answer file: set `filed_to_wiki: true` and add a link to the destination article
+3. Add or update wikilinks so the newly surfaced neighboring concepts become part of the wiki graph
+4. Update all indexes (`_index.md`, `_glossary.md`, `_recent.md`)
+5. Update the answer file: set `filed_to_wiki: true` and add a link to the destination article
 
 This way explorations and queries always "add up" in the knowledge base.
