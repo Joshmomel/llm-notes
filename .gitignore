@@ -2,3 +2,10 @@
 .DS_Store
 .idea/
 .cursor/
+*.egg-info/
+*.egg
+*.pyc
+__pycache__/
+dist/
+build/
+.env

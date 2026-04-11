@@ -55,7 +55,7 @@ cd llm-notes
 ./install.sh
 ```
 
-`install.sh` symlinks the skills in this repository into `~/.claude/skills/`, making `/kb-init`, `/kb-compile`, `/kb-qa`, `/kb-lint`, `/kb-slides`, `/kb-viz`, and `/kb-search` available globally inside Claude Code.
+`install.sh` symlinks the skills in this repository into `~/.claude/skills/` and installs the local `llm_notes` Python helper package in editable mode. That package backs stable search and manifest helpers, so `/kb-search` no longer depends on generating an ad hoc script body inside each vault.
 
 ## Quick Start
 
@@ -154,6 +154,7 @@ your-kb/
 │       ├── _index.md
 │       └── <article>.md
 └── outputs/
+    ├── _manifest.json
     ├── answers/
     ├── images/
     └── slides/
@@ -165,6 +166,9 @@ Important detail: in the current implementation, source files live directly in t
 
 ```text
 llm-notes/
+├── llm_notes/
+│   ├── manifest.py
+│   └── search.py
 ├── skills/
 │   ├── kb-init/
 │   ├── kb-compile/
@@ -173,6 +177,10 @@ llm-notes/
 │   ├── kb-slides/
 │   ├── kb-viz/
 │   └── kb-search/
+├── tests/
+│   ├── test_manifest.py
+│   └── test_search.py
+├── pyproject.toml
 ├── install.sh
 ├── README.md
 └── README.zh-CN.md

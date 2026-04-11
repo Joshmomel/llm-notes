@@ -44,8 +44,10 @@ If no specific file is given, find source material not yet compiled:
 3. **Scan code files outside the primary source root if the user explicitly points to them** — for example `.py`, `.ts`, `.js`, `.go`, `.rs`, `.java`, `.md`
 
 To check what's already compiled:
-- Read all wiki articles' frontmatter `sources:` fields
-- Any eligible source file not listed is uncompiled
+- Prefer `outputs/_manifest.json` if it exists:
+  - compare recorded `digest` / `mtime_ns` values to detect new or stale sources
+  - treat any missing manifest entry as uncompiled
+- Fall back to reading wiki articles' frontmatter `sources:` fields only when the manifest is missing
 - Store source paths relative to the KB root
 
 If nothing to compile, inform the user.
@@ -130,6 +132,10 @@ After writing the article:
    ```markdown
    - YYYY-MM-DD [[category/article-name]] — new / updated
    ```
+
+5. **Manifest** — Update `outputs/_manifest.json`:
+   - For every compiled source, store its relative path, content digest, source mtime, compile timestamp, and destination wiki articles
+   - Keep the manifest deterministic and machine-readable so later `/kb-compile` and `/kb-lint` runs can diff source changes without reparsing every article
 
 ### Step 6: Report
 

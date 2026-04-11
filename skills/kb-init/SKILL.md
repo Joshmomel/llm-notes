@@ -36,6 +36,7 @@ Initialize a knowledge base in the specified directory (default: current directo
    ├── wiki/
    ├── outputs/
    │   ├── answers/
+   │   ├── _manifest.json
    │   ├── slides/
    │   └── images/
    ```
@@ -72,13 +73,22 @@ Initialize a knowledge base in the specified directory (default: current directo
    (No updates yet. This file is updated automatically when articles are compiled.)
    ```
 
-6. **Create `.gitignore`** (only if it doesn't exist):
+6. **Create `outputs/_manifest.json`:**
+   ```json
+   {
+     "version": 1,
+     "updated_at": null,
+     "sources": {}
+   }
+   ```
+
+7. **Create `.gitignore`** (only if it doesn't exist):
    ```
    .obsidian/
    .DS_Store
    ```
 
-7. **Create `CLAUDE.md`** with the following content:
+8. **Create `CLAUDE.md`** with the following content:
 
    ```markdown
    # Knowledge Base
@@ -129,6 +139,7 @@ Initialize a knowledge base in the specified directory (default: current directo
    2. Update `wiki/_index.md` (master index — categories list, stats)
    3. Update `wiki/_glossary.md` with any new terms
    4. Update `wiki/_recent.md` with the change
+   5. Update `outputs/_manifest.json` with source digests and destination article paths
 
    ## Available Skills
 
@@ -137,9 +148,9 @@ Initialize a knowledge base in the specified directory (default: current directo
    - `/kb-lint` — Run health checks, view stats, get exploration suggestions
    ```
 
-8. **Auto-compile** — After initialization, automatically run the `/kb-compile` workflow to compile any existing source material in the directory into wiki articles. If the directory is empty, skip this step and explicitly tell the user the KB has no source files yet and they should drop files into the directory first.
+9. **Auto-compile** — After initialization, automatically run the `/kb-compile` workflow to compile any existing source material in the directory into wiki articles. If the directory is empty, skip this step and explicitly tell the user the KB has no source files yet and they should drop files into the directory first.
 
-9. **Print summary:**
+10. **Print summary:**
    ```
    KB initialized in <target>/
    - Source mode: KB root (`<target>/`)

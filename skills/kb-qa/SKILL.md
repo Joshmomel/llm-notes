@@ -1,10 +1,10 @@
 ---
 name: kb-qa
-version: 0.1.3
+version: 0.1.4
 description: |
   Ask questions against the knowledge base wiki. Reuses the wiki
-  full-text search index when available to shortlist candidate
-  articles, then navigates indexes, extends the local knowledge
+  full-text search index only when broad or ambiguous questions need
+  retrieval help, then navigates indexes, extends the local knowledge
   network through related links and neighboring concepts, reads
   relevant articles, synthesizes answers with citations, surfaces
   gaps and deep follow-up investigation threads, saves to outputs/,
@@ -40,12 +40,13 @@ Find the nearest directory containing `wiki/`. If not found, tell the user to ru
 Follow the navigation protocol to find relevant content:
 
 1. **Read `wiki/_index.md`** — identify relevant categories and distill likely search terms
-2. **Reuse the `/kb-search` search path when possible**:
-   - If `wiki/_search.py` is missing, create it using the same script contract as `/kb-search` and make it executable
-   - If `wiki/_search_index.json` is missing or older than the newest wiki article, rebuild it with `python3 wiki/_search.py index`
-   - Run `python3 wiki/_search.py search "<question keywords>"` to shortlist candidate articles
+2. **Read category `_index.md` files** — confirm coverage and identify specific articles
+3. **Use the `/kb-search` path only when it will materially improve recall**:
+   - Prefer direct wiki navigation first for specific questions or small-to-medium knowledge bases
+   - Reach for search when the question is broad, ambiguous, cross-cutting, or the candidate set is too large to navigate confidently from indexes alone
+   - If `wiki/_search.py` is available and `python3 wiki/_search.py stale` prints `fresh`, run `python3 wiki/_search.py search "<question keywords>"` to shortlist candidate articles
+   - If the wrapper or index is missing or stale, skip search during `/kb-qa` instead of installing or rebuilding infrastructure mid-answer
    - Treat search as a retrieval accelerator, not a substitute for reading the cited sources
-3. **Read category `_index.md` files** — confirm coverage and identify specific articles (read 1-3 category indexes)
 4. **Read relevant articles** — read 3-10 articles that relate to the question, prioritizing high-ranked search hits when available
 5. **Extend the knowledge network** — from the strongest seed articles, follow relevant `[[wikilinks]]`, backlinks, sibling articles in the same category, contrasting approaches, and prerequisite concepts for 1-2 hops to map nearby concepts that materially change the answer
 6. **Track deep investigation threads** — note open loops, contradictions, edge cases, second-order implications, and unresolved comparisons worth pursuing beyond the initial answer
@@ -56,11 +57,6 @@ Follow the navigation protocol to find relevant content:
 ### Step 3: Synthesize Answer
 
 Write a comprehensive answer:
-- The answer body must use the same four-part skeleton every time, in this exact order:
-  1. `## Main Conclusion`
-  2. `## Knowledge Network Extension`
-  3. `## Deep-Dive Threads`
-  4. `## Further Questions`
 - If the user is writing in another language, localize the section titles, but keep the same four-section structure and order
 - Put any tables, comparisons, or richer exposition inside `## Main Conclusion`, not in place of the required skeleton
 - Use `[[wikilinks]]` to cite wiki articles inline

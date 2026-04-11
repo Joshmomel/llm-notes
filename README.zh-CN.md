@@ -21,6 +21,8 @@
 | `/kb-compile` | 读取知识库根目录中的源材料，生成或更新结构化 wiki 文章，并维护 `_index.md`、`_glossary.md`、`_recent.md`      |
 | `/kb-qa`      | 基于现有 wiki 回答问题，优先复用 `/kb-search` 的 TF-IDF 索引召回候选文章，并沿相关概念延伸知识网络；在覆盖不足时回读源文件，将答案保存到 `outputs/answers/`，并可选择回填到 wiki |
 | `/kb-lint`    | 执行健康检查，识别孤立文章、失效 wikilinks、过时内容和未覆盖源文件，将报告保存到 `outputs/lint-report.md`，并自动修复安全项 |
+| `/kb-slides`  | 基于 wiki 内容生成 Marp 幻灯片，保存到 `outputs/slides/`，可在 Obsidian 中配合 Marp 插件查看 |
+| `/kb-viz`     | 基于 wiki 数据生成 matplotlib 图表和关系图，保存到 `outputs/images/`，可嵌入到 wiki 文章 |
 | `/kb-search`  | 基于 TF-IDF 倒排索引对 wiki 做全文搜索；既可直接使用，也可作为 `/kb-qa` 等更大查询流程的检索加速器 |
 
 
@@ -53,7 +55,7 @@ cd llm-notes
 ./install.sh
 ```
 
-`install.sh` 会将仓库中的 skill 目录软链接到 `~/.claude/skills/`，使 `/kb-init`、`/kb-compile`、`/kb-qa`、`/kb-lint`、`/kb-slides`、`/kb-viz` 和 `/kb-search` 可以在 Claude Code 中全局使用。
+`install.sh` 会将仓库中的 skill 目录软链接到 `~/.claude/skills/`，并以 editable 模式安装本地 `llm_notes` Python 辅助包。这样 `/kb-search` 与后续 manifest 逻辑会复用仓库内置实现，而不是在每个知识库里临时生成一份脚本正文。
 
 ## 快速开始
 
@@ -115,6 +117,7 @@ your-kb/
 │       ├── _index.md
 │       └── <article>.md
 └── outputs/
+    ├── _manifest.json
     ├── answers/
     ├── images/
     └── slides/
@@ -126,11 +129,21 @@ your-kb/
 
 ```text
 llm-notes/
+├── llm_notes/
+│   ├── manifest.py
+│   └── search.py
 ├── skills/
 │   ├── kb-init/
 │   ├── kb-compile/
 │   ├── kb-qa/
-│   └── kb-lint/
+│   ├── kb-lint/
+│   ├── kb-slides/
+│   ├── kb-viz/
+│   └── kb-search/
+├── tests/
+│   ├── test_manifest.py
+│   └── test_search.py
+├── pyproject.toml
 ├── install.sh
 ├── README.md
 └── README.zh-CN.md
