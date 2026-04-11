@@ -1,10 +1,11 @@
 ---
 name: kb-qa
-version: 0.1.0
+version: 0.1.1
 description: |
   Ask questions against the knowledge base wiki. Navigates indexes,
   reads relevant articles, synthesizes answers with citations,
-  saves to outputs/, and optionally files insights back into the wiki.
+  surfaces gaps and follow-up questions, saves to outputs/,
+  and optionally files insights back into the wiki.
 allowed-tools:
   - Read
   - Write
@@ -16,7 +17,7 @@ trigger: /kb-qa
 
 # /kb-qa — Question Answering
 
-Ask questions against the knowledge base. Answers are synthesized from wiki articles with citations.
+Ask questions against the knowledge base. Answers are synthesized from wiki articles with citations and should surface promising next questions.
 
 ## Usage
 
@@ -39,6 +40,7 @@ Follow the navigation protocol to find relevant content:
 3. **Read relevant articles** — read 3-10 articles that relate to the question
 4. **Check source files if needed** — if wiki coverage is insufficient, read KB-root files directly while excluding `wiki/`, `outputs/`, hidden dirs, `CLAUDE.md`, and `.gitignore`
 5. **Note gaps** — track any topics the wiki doesn't cover well
+6. **Note next questions** — track concrete follow-up questions opened up by the evidence, contradictions, or missing coverage
 
 ### Step 3: Synthesize Answer
 
@@ -47,6 +49,9 @@ Write a comprehensive answer:
 - Include specific details from the articles
 - If you found conflicting information, note it
 - If the wiki has gaps, mention what's missing
+- Include a `## Further Questions` section with 3-7 concrete next questions or investigation threads
+- Make the follow-up questions specific to what you learned, not generic research boilerplate
+- For each follow-up question, add a short clause about why it matters or what evidence would help answer it
 
 ### Step 4: Save Answer
 
@@ -76,6 +81,11 @@ filed_to_wiki: false
 
 - Topics not covered in the wiki
 - Areas that need more research
+
+## Further Questions
+
+- A specific follow-up question raised by the answer — why it matters
+- Another question to investigate next — what evidence would resolve it
 ```
 
 ### Step 5: Offer to File Back
