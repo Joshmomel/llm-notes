@@ -1,70 +1,150 @@
 # llm-notes
 
-LLM-powered personal knowledge base system. Source material goes in, a structured wiki comes out — compiled, indexed, and maintained entirely by an LLM.
+[English](README.md) | [简体中文](README.zh-CN.md)
 
-Built as a set of [Claude Code](https://claude.ai/code) skills. Clone, install, and start using.
+`llm-notes` is a lightweight knowledge base workflow for [Claude Code](https://claude.ai/code). It turns a directory of notes, papers, code, screenshots, and other mixed source material into an LLM-maintained Markdown wiki. Q&A outputs, indexes, and health reports remain local files, making the system easy to inspect, version, and browse in [Obsidian](https://obsidian.md/).
 
-## How it works
+This project is inspired by **Andrej Karpathy**'s idea. See: [LLM Knowledge Bases](https://x.com/karpathy/status/2039805659525644595)
 
-1. You collect source material (articles, papers, code, images)
-2. The LLM compiles it into a structured markdown wiki with summaries, backlinks, and cross-references
-3. You ask questions against the wiki — answers cite sources and accumulate back into the knowledge base
-4. The LLM runs health checks to find gaps, inconsistencies, and new topics to explore
+## Overview
 
-Everything is viewable in [Obsidian](https://obsidian.md/).
+`llm-notes` treats the knowledge base root itself as the source root. Original files stay directly in the KB root, `wiki/` stores LLM-compiled articles, indexes, and glossary pages, and `outputs/` stores generated artifacts such as answers, slides, and images.
 
-## Install
+Unlike workflows that require a `raw/` + `wiki/` layout, the current implementation of `llm-notes` does **not** require a separate `raw/` directory. If a directory already contains files, `/kb-init` treats those files as the canonical source material and initializes the derived wiki structure around them.
+
+## Core Capabilities
+
+
+| Command       | Purpose                                                                                                                                                                         |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/kb-init`    | Initialize a knowledge base directory, create `wiki/`, `outputs/`, `CLAUDE.md`, and starter indexes, and auto-compile existing material when present                            |
+| `/kb-compile` | Read source material from the KB root, create or update structured wiki articles, and maintain `_index.md`, `_glossary.md`, and `_recent.md`                                    |
+| `/kb-qa`      | Answer questions against the wiki, fall back to source files when coverage is insufficient, save answers to `outputs/answers/`, and optionally file insights back into the wiki |
+| `/kb-lint`    | Run health checks, identify orphan articles, broken wikilinks, stale content, and uncovered sources, save a report to `outputs/lint-report.md`, and auto-fix safe issues        |
+
+
+## Design Principles
+
+- **Markdown-first**: important knowledge lives in local files you can inspect and version.
+- **Source-first**: original files are authoritative; wiki articles are derived and regenerable.
+- **LLM-maintained**: summaries, indexes, backlinks, glossary entries, and filed-back insights are maintained by the LLM.
+- **Obsidian-friendly**: the output structure and link style are designed to work well as a local Obsidian vault.
+- **Minimal infrastructure**: no database, service layer, or mandatory vector store is required to get started.
+
+## Use Cases
+
+- Research vaults for papers, archived web articles, screenshots, reading notes, and mixed source material
+- Codebase understanding, architecture notes, and navigable documentation for existing repositories
+- Long-running topic investigations where each query should accumulate back into the knowledge base
+- Local-first knowledge management where important outputs remain inspectable as Markdown files
+
+## Requirements
+
+- [Claude Code](https://claude.ai/code)
+- A directory that already contains source material, or an empty directory you want to turn into a knowledge base
+- [Obsidian](https://obsidian.md/) if you want the best browsing experience
+
+## Installation
 
 ```bash
-git clone https://github.com/<user>/llm-notes.git
+git clone https://github.com/Joshmomel/llm-notes.git
 cd llm-notes
 ./install.sh
 ```
 
-This symlinks the skills to `~/.claude/skills/` so they're available globally.
+`install.sh` symlinks the skills in this repository into `~/.claude/skills/`, making `/kb-init`, `/kb-compile`, `/kb-qa`, and `/kb-lint` available globally inside Claude Code.
 
-## Quick start
+## Quick Start
+
+After installation, open any directory you want to use as a knowledge base in Claude Code and run:
 
 ```bash
-# In Claude Code, from any directory:
-/kb-init .              # Initialize KB in current directory
-# The current directory itself is the source root
-# If the directory is empty, drop files here first
-/kb-compile             # Compile into wiki
-/kb-qa "your question"  # Ask questions
-/kb-lint                # Health check
+# inside Claude Code
+/kb-init .
+/kb-qa "What are the main themes in this knowledge base?"
+/kb-lint
 ```
 
-## Skills
+If the directory already contains files, `/kb-init` will initialize the KB structure and auto-compile the existing material.
 
-| Skill | Description |
-|-------|-------------|
-| `/kb-init` | Initialize a knowledge base in any directory |
-| `/kb-compile` | Compile source material from the current KB root into wiki articles |
-| `/kb-qa` | Ask questions against the wiki, save answers, file back insights |
-| `/kb-lint` | Health checks, stats, and exploration suggestions |
+If the directory is empty, `/kb-init` will create the KB structure first. After you add source files into that directory, run:
 
-## Use cases
-
-**Research notes** — Run `/kb-init` inside a folder that already contains your notes, or initialize an empty folder and drop files into it, then compile into a structured wiki and ask complex questions across all your sources.
-
-**Code understanding** — Run `/kb-init` in a code repo, `/kb-compile` to generate architecture docs, then `/kb-qa` to ask questions about the codebase.
-
-## Architecture
-
-```
-your-directory/
-├── CLAUDE.md          # LLM operating instructions (auto-generated)
-├── <your files>       # Source material lives directly in the KB root
-├── wiki/              # LLM-compiled knowledge base
-│   ├── _index.md      # Master index
-│   ├── _glossary.md   # Term definitions
-│   ├── _recent.md     # Recent updates
-│   └── <category>/    # Topic directories with articles
-└── outputs/           # Generated answers, slides, images
+```bash
+# inside Claude Code
+/kb-compile
+/kb-qa "What key concepts have been established so far?"
 ```
 
-- **No database** — everything is markdown files
-- **No RAG** — hierarchical indexes let the LLM navigate in 2-3 reads
-- **No dependencies** — just Claude Code skills (structured prompts)
-- The LLM writes and maintains the wiki. You rarely touch it directly.
+## Typical Workflows
+
+### Existing Notes Or Repository
+
+Use this when you already have documents, code, or research material in a directory:
+
+```bash
+# inside Claude Code
+/kb-init .
+/kb-qa "Summarize the main themes and structure here"
+/kb-lint
+```
+
+### Start From An Empty Directory
+
+Use this when you want to build a new knowledge base from scratch:
+
+```bash
+# inside Claude Code
+/kb-init .
+# add notes, code, PDFs, images, or other source files into this directory
+/kb-compile
+/kb-qa "What topics have emerged in the knowledge base so far?"
+```
+
+## Generated Knowledge Base Layout
+
+```text
+your-kb/
+├── CLAUDE.md             # LLM operating instructions for this KB
+├── <source files...>     # Canonical source material stays in the KB root
+├── wiki/
+│   ├── _index.md
+│   ├── _glossary.md
+│   ├── _recent.md
+│   └── <category>/
+│       ├── _index.md
+│       └── <article>.md
+└── outputs/
+    ├── answers/
+    ├── images/
+    └── slides/
+```
+
+Important detail: in the current implementation, source files live directly in the KB root. `llm-notes` does **not** require a separate `raw/` directory.
+
+## Repository Layout
+
+```text
+llm-notes/
+├── skills/
+│   ├── kb-init/
+│   ├── kb-compile/
+│   ├── kb-qa/
+│   └── kb-lint/
+├── install.sh
+├── README.md
+└── README.zh-CN.md
+```
+
+## Scope And Limitations
+
+- This is a prompt-and-files workflow, not a hard-coded indexing engine.
+- Knowledge quality depends on the quality of the source material and on the LLM consistently following the KB conventions.
+- The `wiki/` layer becomes more valuable over time as more material is compiled, more answers are filed back, and more lint issues are resolved.
+- The current approach is especially well suited to small and medium-sized knowledge bases that can be navigated effectively through summaries and indexes.
+
+## References
+
+- [LLM Knowledge Bases](https://x.com/karpathy/status/2039805659525644595)
+- [graphify README](https://github.com/safishamsi/graphify/blob/v4/README.md)
+- [WikiLLM README](https://github.com/wang-junjian/wikillm/blob/main/README.md)
+
