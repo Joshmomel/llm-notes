@@ -18,6 +18,8 @@ ANSWER_FRONTMATTER_ORDER = (
     "title",
     "date",
     "question",
+    "retrieval_mode",
+    "retrieval_trace",
     "sources_consulted",
     "filing_status",
     "filed_to_wiki",
@@ -66,6 +68,15 @@ class AnswerNote:
     def sources_consulted(self) -> list[str]:
         value = self.metadata.get("sources_consulted")
         return _normalize_list(value)
+
+    @property
+    def retrieval_mode(self) -> str:
+        value = self.metadata.get("retrieval_mode")
+        return str(value).strip() if value else ""
+
+    @property
+    def retrieval_trace(self) -> list[str]:
+        return _normalize_list(self.metadata.get("retrieval_trace"))
 
     @property
     def filed_to_wiki(self) -> bool:
@@ -237,6 +248,8 @@ def save_answer(
     title: str | None = None,
     answer_date: str | None = None,
     sources_consulted: list[str] | None = None,
+    retrieval_mode: str | None = None,
+    retrieval_trace: list[str] | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> Path:
     root = Path(kb_root).resolve()
@@ -246,6 +259,8 @@ def save_answer(
         "title": title or f"Answer: {question}",
         "date": note_date,
         "question": question,
+        "retrieval_mode": retrieval_mode or "",
+        "retrieval_trace": sorted(set(_normalize_list(retrieval_trace))),
         "sources_consulted": sorted(set(_normalize_list(sources_consulted))),
         "filing_status": "pending",
         "filed_to_wiki": False,
@@ -268,10 +283,12 @@ def parse_answer(path: str | Path, kb_root: str | Path | None = None) -> AnswerN
     metadata, body = parse_frontmatter(text)
     normalized = dict(metadata)
     normalized["sources_consulted"] = _normalize_list(normalized.get("sources_consulted"))
+    normalized["retrieval_trace"] = _normalize_list(normalized.get("retrieval_trace"))
     normalized["filed_wikilinks"] = _normalize_list(normalized.get("filed_wikilinks"))
     normalized["promotion_targets"] = _normalize_list(normalized.get("promotion_targets"))
     normalized["filed_to_wiki"] = _normalize_bool(normalized.get("filed_to_wiki"))
     normalized["promotion_score"] = _normalize_float(normalized.get("promotion_score"))
+    normalized["retrieval_mode"] = str(normalized.get("retrieval_mode") or "").strip()
     normalized["filing_status"] = str(normalized.get("filing_status") or "pending").strip()
     return AnswerNote(
         path=note_path,
@@ -543,6 +560,8 @@ def finalize_answer(
     title: str | None = None,
     answer_date: str | None = None,
     sources_consulted: list[str] | None = None,
+    retrieval_mode: str | None = None,
+    retrieval_trace: list[str] | None = None,
     metadata: dict[str, Any] | None = None,
     auto_file: bool = True,
     file_mode: str = "auto",
@@ -561,6 +580,8 @@ def finalize_answer(
         title=title,
         answer_date=answer_date,
         sources_consulted=sources_consulted,
+        retrieval_mode=retrieval_mode,
+        retrieval_trace=retrieval_trace,
         metadata=metadata,
     )
     answer = parse_answer(answer_path, root)
@@ -602,6 +623,8 @@ def finalize_answer(
     return {
         "answer_path": str(answer_path),
         "answer_rel_path": final_answer.rel_path,
+        "retrieval_mode": final_answer.retrieval_mode,
+        "retrieval_trace": final_answer.retrieval_trace,
         "filed_to_wiki": final_answer.filed_to_wiki,
         "filing_status": final_answer.filing_status,
         "filed_wikilinks": final_answer.filed_wikilinks,
@@ -710,6 +733,8 @@ def main(argv: list[str] | None = None) -> int:
     save_parser.add_argument("--title")
     save_parser.add_argument("--date")
     save_parser.add_argument("--source-consulted", action="append", default=[])
+    save_parser.add_argument("--retrieval-mode")
+    save_parser.add_argument("--retrieval-trace", action="append", default=[])
     save_parser.add_argument("--metadata-json")
     save_body = save_parser.add_mutually_exclusive_group(required=True)
     save_body.add_argument("--body-file")
@@ -724,6 +749,8 @@ def main(argv: list[str] | None = None) -> int:
     finalize_parser.add_argument("--title")
     finalize_parser.add_argument("--date")
     finalize_parser.add_argument("--source-consulted", action="append", default=[])
+    finalize_parser.add_argument("--retrieval-mode")
+    finalize_parser.add_argument("--retrieval-trace", action="append", default=[])
     finalize_parser.add_argument("--metadata-json")
     finalize_parser.add_argument("--mode", choices=("auto", "new", "enrich"), default="auto")
     finalize_parser.add_argument("--article")
@@ -765,6 +792,8 @@ def main(argv: list[str] | None = None) -> int:
             title=args.title,
             answer_date=args.date,
             sources_consulted=args.source_consulted,
+            retrieval_mode=args.retrieval_mode,
+            retrieval_trace=args.retrieval_trace,
             metadata=metadata,
         )
         print(
@@ -794,6 +823,8 @@ def main(argv: list[str] | None = None) -> int:
             title=args.title,
             answer_date=args.date,
             sources_consulted=args.source_consulted,
+            retrieval_mode=args.retrieval_mode,
+            retrieval_trace=args.retrieval_trace,
             metadata=metadata,
             auto_file=not args.no_auto_file,
             file_mode=args.mode,

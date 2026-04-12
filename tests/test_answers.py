@@ -20,12 +20,16 @@ class AnswerTests(unittest.TestCase):
                 question="How do transformers scale to long context?",
                 body="# Long Context\n\n## Main Conclusion\n\nThey rely on attention variants.",
                 sources_consulted=["wiki/ml/attention.md"],
+                retrieval_mode="wiki_only",
+                retrieval_trace=["wiki:ml/attention.md"],
             )
 
             answer = parse_answer(note_path, kb_root)
             self.assertEqual(answer.question, "How do transformers scale to long context?")
             self.assertEqual(answer.filing_status, "pending")
             self.assertFalse(answer.filed_to_wiki)
+            self.assertEqual(answer.retrieval_mode, "wiki_only")
+            self.assertEqual(answer.retrieval_trace, ["wiki:ml/attention.md"])
             self.assertEqual(answer.sources_consulted, ["wiki/ml/attention.md"])
 
     def test_resolve_answer_sources_reads_wiki_article_sources(self) -> None:
@@ -213,6 +217,8 @@ class AnswerTests(unittest.TestCase):
                     "- Which benchmark suite is missing long-context cases?"
                 ),
                 sources_consulted=["wiki/ml/attention.md", "notes/retrieval.md"],
+                retrieval_mode="hybrid",
+                retrieval_trace=["wiki:ml/attention.md", "source:notes/retrieval.md#chunk-001"],
                 title="Attention vs Retrieval for Long Context",
                 category="synthesis",
                 tags=["attention", "retrieval"],
@@ -222,6 +228,11 @@ class AnswerTests(unittest.TestCase):
             lint_state = run_lint(kb_root)
 
             self.assertTrue(answer.filed_to_wiki)
+            self.assertEqual(answer.retrieval_mode, "hybrid")
+            self.assertEqual(
+                answer.retrieval_trace,
+                ["source:notes/retrieval.md#chunk-001", "wiki:ml/attention.md"],
+            )
             self.assertIsNotNone(result["filing_result"])
             self.assertIsNotNone(result["lint_result"])
             self.assertTrue((kb_root / "outputs" / "lint-report.md").exists())

@@ -194,7 +194,7 @@ def _insert_implicit_or(tokens: list[str | list[str]]) -> list[str | list[str]]:
     for token in tokens:
         current_operand = isinstance(token, list) or token == "(" or token == "NOT"
         if previous_operand and current_operand:
-            result.append("AND" if token in {"(", "NOT"} else "OR")
+            result.append("AND" if token == "(" or token == "NOT" else "OR")
         result.append(token)
         previous_operand = isinstance(token, list) or token == ")"
     return result

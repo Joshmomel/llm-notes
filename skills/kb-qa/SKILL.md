@@ -2,13 +2,13 @@
 name: kb-qa
 version: 0.1.4
 description: |
-  Ask questions against the knowledge base wiki. Reuses the wiki
-  full-text search index only when broad or ambiguous questions need
-  retrieval help, then navigates indexes, extends the local knowledge
-  network through related links and neighboring concepts, reads
-  relevant articles, synthesizes answers with citations, surfaces
-  gaps and deep follow-up investigation threads, saves to outputs/,
-  and optionally files insights back into the wiki.
+  Ask questions against the knowledge base. Uses a dual-layer
+  retrieval helper that can search both the compiled wiki and raw
+  source material, then navigates indexes, extends the local
+  knowledge network through related links and neighboring concepts,
+  reads relevant articles and source files, synthesizes answers with
+  citations, surfaces gaps and deep follow-up investigation threads,
+  saves to outputs/, and optionally files insights back into the wiki.
 allowed-tools:
   - Read
   - Write
@@ -41,16 +41,28 @@ Follow the navigation protocol to find relevant content:
 
 1. **Read `wiki/_index.md`** — identify relevant categories and distill likely search terms
 2. **Read category `_index.md` files** — confirm coverage and identify specific articles
-3. **Use the `/kb-search` path only when it will materially improve recall**:
+3. **Use deterministic retrieval when it will materially improve recall**:
    - Prefer direct wiki navigation first for specific questions or small-to-medium knowledge bases
-   - Reach for search when the question is broad, ambiguous, cross-cutting, or the candidate set is too large to navigate confidently from indexes alone
-   - If `wiki/_search.py` is available and `python3 wiki/_search.py stale` prints `fresh`, run `python3 wiki/_search.py search "<question keywords>"` to shortlist candidate articles
-   - If the wrapper or index is missing or stale, skip search during `/kb-qa` instead of installing or rebuilding infrastructure mid-answer
-   - Treat search as a retrieval accelerator, not a substitute for reading the cited sources
-4. **Read relevant articles** — read 3-10 articles that relate to the question, prioritizing high-ranked search hits when available
-5. **Extend the knowledge network** — from the strongest seed articles, follow relevant `[[wikilinks]]`, backlinks, sibling articles in the same category, contrasting approaches, and prerequisite concepts for 1-2 hops to map nearby concepts that materially change the answer
-6. **Track deep investigation threads** — note open loops, contradictions, edge cases, second-order implications, and unresolved comparisons worth pursuing beyond the initial answer
-7. **Check source files if needed** — if wiki coverage is insufficient, read KB-root files directly while excluding `wiki/`, `outputs/`, hidden dirs, `CLAUDE.md`, and `.gitignore`
+   - Reach for retrieval when the question is broad, ambiguous, cross-cutting, code-sensitive, or the candidate set is too large to navigate confidently from indexes alone
+   - Preferred helper:
+
+     ```bash
+     python3 -m llm_notes.retrieval query \
+       --kb-root <kb-root> \
+       --question "<full question>" \
+       --json
+     ```
+
+   - In `auto` mode the helper does **not** hard-route for you. Instead it returns:
+     - `suggested_mode: wiki_only` — compiled wiki should answer this first
+     - `suggested_mode: source_only` — the question asks for exact source-level evidence
+     - `suggested_mode: hybrid` — combine compiled wiki context with raw source retrieval
+   - In `auto` mode inspect both `wiki_results` and `source_results`, then decide yourself which layer to trust more for the current question
+   - Use the returned shortlist as navigation support, not as a substitute for reading the cited sources
+4. **Read relevant articles** — read 3-10 articles that relate to the question, prioritizing high-ranked retrieval hits when available
+5. **Read relevant source files when warranted** — if retrieval returns `source_results`, or if wiki coverage is clearly insufficient, read the referenced KB-root source files directly while excluding `wiki/`, `outputs/`, hidden dirs, `CLAUDE.md`, and `.gitignore`
+6. **Extend the knowledge network** — from the strongest seed articles, follow relevant `[[wikilinks]]`, backlinks, sibling articles in the same category, contrasting approaches, and prerequisite concepts for 1-2 hops to map nearby concepts that materially change the answer
+7. **Track deep investigation threads** — note open loops, contradictions, edge cases, second-order implications, and unresolved comparisons worth pursuing beyond the initial answer
 8. **Note gaps** — track any topics the wiki doesn't cover well
 9. **Note next questions** — track concrete follow-up questions opened up by the evidence, contradictions, missing coverage, or network expansion
 
@@ -125,6 +137,9 @@ Prefer the deterministic finisher helper instead of manually chaining save/file/
 python3 -m llm_notes.answers finalize \
   --kb-root <kb-root> \
   --question "<full question>" \
+  --retrieval-mode <wiki_only|source_only|hybrid> \
+  --retrieval-trace wiki:category/article.md \
+  --retrieval-trace source:notes/source-file.md#chunk-001 \
   --source-consulted wiki/category/article.md \
   --source-consulted wiki/category/other-article.md \
   --mode auto \
@@ -156,6 +171,8 @@ python3 -m llm_notes.answers finalize \
 ...
 EOF
 ```
+
+If you used the retrieval helper, carry the **actual mode you ended up relying on** into `--retrieval-mode`, not just the helper's suggestion. This gives the KB an audit trail for whether the answer depended mainly on compiled wiki context, raw source reads, or both.
 
 Default behavior: `finalize` saves the answer note into `outputs/answers/`, auto-files reusable synthesis when appropriate, and refreshes `outputs/lint-report.md`.
 
