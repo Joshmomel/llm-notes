@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import sys
 import tempfile
 import unittest
 from contextlib import redirect_stdout
@@ -15,6 +16,7 @@ from llm_notes.compile import (
     main,
     record_compilation,
     sync_kb_indexes,
+    write_compiled_article,
 )
 from llm_notes.manifest import load_manifest, save_manifest, update_source_entry
 from llm_notes.wiki import serialize_article
@@ -34,9 +36,12 @@ class CompileTests(unittest.TestCase):
             kb_root = Path(tmpdir)
             (kb_root / "wiki").mkdir()
             (kb_root / "outputs").mkdir()
+            egg_dir = kb_root / "demo.egg-info"
+            egg_dir.mkdir()
             (kb_root / "notes.md").write_text("hello", encoding="utf-8")
             (kb_root / "wiki" / "ignored.md").write_text("ignored", encoding="utf-8")
             (kb_root / "outputs" / "also-ignored.md").write_text("ignored", encoding="utf-8")
+            (egg_dir / "PKG-INFO").write_text("ignored", encoding="utf-8")
             (kb_root / ".hidden.md").write_text("hidden", encoding="utf-8")
 
             records = discover_sources(kb_root)
@@ -177,6 +182,65 @@ class CompileTests(unittest.TestCase):
             kb_root = Path(tmpdir)
             with self.assertRaises(RuntimeError):
                 main(["sync-indexes", "--kb-root", str(kb_root)])
+
+    def test_write_compiled_article_updates_all_bookkeeping(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            kb_root = Path(tmpdir)
+            (kb_root / "wiki").mkdir()
+            source = kb_root / "notes.md"
+            source.write_text("# Note\n\nBody", encoding="utf-8")
+
+            result = write_compiled_article(
+                kb_root,
+                title="Attention",
+                body="## Summary\n\nBody",
+                category="ml",
+                sources=["notes.md"],
+                tags=["attention"],
+                created="2026-04-12",
+                updated="2026-04-12",
+            )
+
+            self.assertEqual(result["wikilink"], "ml/attention")
+            self.assertTrue((kb_root / "wiki" / "ml" / "attention.md").exists())
+            self.assertTrue((kb_root / "outputs" / "_manifest.json").exists())
+            self.assertIn("2026-04-12 [[ml/attention]]", (kb_root / "wiki" / "_recent.md").read_text(encoding="utf-8"))
+            self.assertTrue((kb_root / "wiki" / "_index.md").exists())
+
+    def test_main_write_article_accepts_stdin_body(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            kb_root = Path(tmpdir)
+            (kb_root / "wiki").mkdir()
+            (kb_root / "notes.md").write_text("# Note\n\nBody", encoding="utf-8")
+
+            original_stdin = sys.stdin
+            buffer = io.StringIO()
+            try:
+                sys.stdin = io.StringIO("## Summary\n\nBody from stdin\n")
+                with redirect_stdout(buffer):
+                    exit_code = main(
+                        [
+                            "write-article",
+                            "--kb-root",
+                            str(kb_root),
+                            "--title",
+                            "CLI Article",
+                            "--category",
+                            "ml",
+                            "--source",
+                            "notes.md",
+                            "--tag",
+                            "cli",
+                            "--body-stdin",
+                        ]
+                    )
+            finally:
+                sys.stdin = original_stdin
+
+            payload = json.loads(buffer.getvalue())
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(payload["wikilink"], "ml/cli-article")
+            self.assertTrue((kb_root / "wiki" / "ml" / "cli-article.md").exists())
 
 
 if __name__ == "__main__":

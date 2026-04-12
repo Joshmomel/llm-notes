@@ -6,11 +6,12 @@ import argparse
 import json
 import os
 from dataclasses import asdict, dataclass
+from datetime import date
 from pathlib import Path
 from typing import Iterable
 
 from llm_notes.manifest import load_manifest, manifest_path, save_manifest, source_is_stale, update_source_entry
-from llm_notes.wiki import article_inventory, sync_indexes
+from llm_notes.wiki import article_inventory, prepend_recent_entry, sync_indexes, write_article
 
 CODE_EXTENSIONS = {
     ".c",
@@ -124,6 +125,8 @@ def _should_skip_path(path: Path, kb_root: Path) -> bool:
     rel_path = _normalized_rel_path_fallback(path, kb_root)
     parts = Path(rel_path).parts
     if path.name.startswith("."):
+        return True
+    if any(part.endswith(".egg-info") for part in parts[:-1]) or path.parent.name.endswith(".egg-info"):
         return True
     if any(part.startswith(".") and part not in {".github"} for part in parts[:-1]):
         return True
@@ -245,6 +248,53 @@ def sync_kb_indexes(kb_root: str | Path) -> dict[str, Path]:
     return sync_indexes(root, total_sources=total_sources)
 
 
+def _recent_entry_date(created: str | None, updated: str | None) -> str:
+    return updated or created or date.today().isoformat()
+
+
+def write_compiled_article(
+    kb_root: str | Path,
+    *,
+    title: str,
+    body: str,
+    category: str = "",
+    slug: str | None = None,
+    sources: list[str] | None = None,
+    tags: list[str] | None = None,
+    created: str | None = None,
+    updated: str | None = None,
+    metadata: dict | None = None,
+) -> dict[str, str]:
+    root = Path(kb_root).resolve()
+    result = write_article(
+        root,
+        title=title,
+        body=body,
+        category=category,
+        slug=slug,
+        sources=sources,
+        tags=tags,
+        created=created,
+        updated=updated,
+        extra_metadata=metadata,
+    )
+    if sources:
+        record_compilation(
+            root,
+            list(sources),
+            [result.path],
+            metadata={"title": title, **(metadata or {})},
+        )
+    prepend_recent_entry(root, f"{_recent_entry_date(created, updated)} [[{result.wikilink}]] — {result.status}")
+    sync_kb_indexes(root)
+    return {
+        "path": str(result.path),
+        "rel_path": result.rel_path,
+        "wikilink": result.wikilink,
+        "status": result.status,
+    }
+
+
 def _resolved_kb_root(kb_root: str | Path | None) -> Path:
     if kb_root is not None:
         root = Path(kb_root).resolve()
@@ -311,6 +361,20 @@ def main(argv: list[str] | None = None) -> int:
     sync_parser = subparsers.add_parser("sync-indexes", help="regenerate category and master indexes from existing articles")
     sync_parser.add_argument("--kb-root")
 
+    write_parser = subparsers.add_parser("write-article", help="write or update a wiki article and finalize bookkeeping")
+    write_parser.add_argument("--kb-root")
+    write_parser.add_argument("--title", required=True)
+    write_parser.add_argument("--category", default="")
+    write_parser.add_argument("--slug")
+    write_parser.add_argument("--source", action="append", default=[])
+    write_parser.add_argument("--tag", action="append", default=[])
+    write_parser.add_argument("--created")
+    write_parser.add_argument("--updated")
+    write_parser.add_argument("--metadata-json", help="optional JSON object merged into article metadata")
+    body_group = write_parser.add_mutually_exclusive_group(required=True)
+    body_group.add_argument("--body-file", help="path to a markdown body file")
+    body_group.add_argument("--body-stdin", action="store_true", help="read the markdown body from stdin")
+
     args = parser.parse_args(argv)
     kb_root = _resolved_kb_root(getattr(args, "kb_root", None))
 
@@ -333,6 +397,29 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Updated {len(written)} index file(s)")
         for key, path in sorted(written.items()):
             print(f"  {key}: {path}")
+        return 0
+
+    if args.command == "write-article":
+        metadata = json.loads(args.metadata_json) if args.metadata_json else None
+        if args.body_file:
+            body = Path(args.body_file).read_text(encoding="utf-8")
+        else:
+            import sys
+
+            body = sys.stdin.read()
+        result = write_compiled_article(
+            kb_root,
+            title=args.title,
+            body=body,
+            category=args.category,
+            slug=args.slug,
+            sources=args.source,
+            tags=args.tag,
+            created=args.created,
+            updated=args.updated,
+            metadata=metadata,
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
 
     parser.print_help()

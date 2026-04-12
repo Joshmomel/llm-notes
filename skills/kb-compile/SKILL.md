@@ -115,6 +115,49 @@ For research sources: summarize findings, key concepts, methodologies.
 
 **Image handling:** If the source material contains or references images, use Obsidian-style image embeds that match the actual source path, for example `![[images/diagram.png]]` or `![[assets/diagram.png]]`.
 
+Preferred deterministic article write:
+
+1. Draft the article body content first, excluding YAML frontmatter.
+2. Write it through the local helper instead of hand-editing article metadata and bookkeeping files yourself:
+
+```bash
+python3 -m llm_notes.compile write-article \
+  --kb-root <kb-root> \
+  --category <category> \
+  --title "<Article Title>" \
+  --source <source-path> \
+  --tag <tag> \
+  --body-stdin <<'EOF'
+## Summary
+
+2-3 sentence overview.
+
+## Content
+
+Main content with `[[wikilinks]]`.
+
+## Sources
+
+- `path/to/source.md` — what it contributed
+
+## Related
+
+- [[other-article]] — how it relates
+
+## Open Questions
+
+- Questions or gaps
+EOF
+```
+
+The helper will:
+- write or update the target wiki article
+- preserve `created` on existing articles and refresh `updated`
+- merge `sources` and `tags`
+- update `outputs/_manifest.json`
+- prepend a standardized `_recent.md` entry
+- sync category and master indexes
+
 ### Step 5: Update Indexes
 
 After writing the article:
@@ -148,15 +191,12 @@ After writing the article:
    - For every compiled source, store its relative path, content digest, source mtime, compile timestamp, and destination wiki articles
    - Keep the manifest deterministic and machine-readable so later `/kb-compile` and `/kb-lint` runs can diff source changes without reparsing every article
 
-Preferred deterministic entrypoints after article writes:
+Fallback deterministic entrypoints after manual article writes:
 
 ```bash
 python3 -m llm_notes.compile record --kb-root <kb-root> --source <source-path> --article <wiki/article.md>
 python3 -m llm_notes.compile sync-indexes --kb-root <kb-root>
 ```
-
-- Run `record` once per compiled source, repeating `--article` when a source contributes to multiple articles
-- Run `sync-indexes` after the batch so `_index.md` files reflect the current article tree
 
 ### Step 6: Report
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +29,14 @@ class Article:
     @property
     def wikilink(self) -> str:
         return self.rel_path.removesuffix(".md")
+
+
+@dataclass(frozen=True)
+class ArticleWriteResult:
+    path: Path
+    rel_path: str
+    wikilink: str
+    status: str
 
 
 def wiki_root(kb_root: str | Path) -> Path:
@@ -177,6 +186,10 @@ def article_path(kb_root: str | Path, category: str, slug: str) -> Path:
     return root / category / f"{slug}.md" if category else root / f"{slug}.md"
 
 
+def _today() -> str:
+    return date.today().isoformat()
+
+
 def read_article(path: str | Path, kb_root: str | Path | None = None) -> Article:
     article_path_obj = Path(path)
     base = wiki_root(kb_root) if kb_root is not None else article_path_obj.parents[1]
@@ -188,6 +201,59 @@ def read_article(path: str | Path, kb_root: str | Path | None = None) -> Article
     category = "/".join(parts[:-1])
     slug = Path(rel_path).stem
     return Article(article_path_obj, rel_path, category, slug, normalized, body)
+
+
+def write_article(
+    kb_root: str | Path,
+    *,
+    title: str,
+    body: str,
+    category: str = "",
+    slug: str | None = None,
+    sources: list[str] | None = None,
+    tags: list[str] | None = None,
+    created: str | None = None,
+    updated: str | None = None,
+    extra_metadata: dict[str, Any] | None = None,
+) -> ArticleWriteResult:
+    root = Path(kb_root)
+    article_slug = slug or slugify(title)
+    target = article_path(root, category, article_slug)
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    existing_metadata: dict[str, Any] = {}
+    if target.exists():
+        existing = read_article(target, root)
+        existing_metadata = dict(existing.metadata)
+        status = "updated"
+    else:
+        status = "created"
+
+    effective_created = existing_metadata.get("created") or created or _today()
+    effective_updated = updated or _today()
+    merged_sources = sorted(set(_normalize_list(existing_metadata.get("sources")) + _normalize_list(sources)))
+    merged_tags = sorted(set(_normalize_list(existing_metadata.get("tags")) + _normalize_list(tags)))
+
+    metadata = dict(existing_metadata)
+    metadata.update(extra_metadata or {})
+    metadata.update(
+        {
+            "title": title,
+            "created": effective_created,
+            "updated": effective_updated,
+            "sources": merged_sources,
+            "tags": merged_tags,
+        }
+    )
+
+    target.write_text(serialize_article(metadata, body), encoding="utf-8")
+    rel_path = target.resolve().relative_to(wiki_root(root).resolve()).as_posix()
+    return ArticleWriteResult(
+        path=target,
+        rel_path=rel_path,
+        wikilink=rel_path.removesuffix(".md"),
+        status=status,
+    )
 
 
 def list_articles(kb_root: str | Path) -> list[Article]:
