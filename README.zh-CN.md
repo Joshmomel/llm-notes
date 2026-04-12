@@ -55,7 +55,7 @@ cd llm-notes
 ./install.sh
 ```
 
-`install.sh` 会将仓库中的 skill 目录软链接到 `~/.claude/skills/`，并以 editable 模式安装本地 `llm_notes` Python 辅助包。这样 `/kb-search` 与后续 manifest 逻辑会复用仓库内置实现，而不是在每个知识库里临时生成一份脚本正文。
+`install.sh` 会将仓库中的 skill 目录软链接到 `~/.claude/skills/`，并以 editable 模式安装本地 `llm_notes` Python 辅助包。现在这层实现已经覆盖 search、manifest、compile planning 和 wiki/index helpers，因此核心 KB 行为可以逐步从 skill 文本约定迁到仓库内可版本化的本地代码。
 
 ## 快速开始
 
@@ -130,8 +130,10 @@ your-kb/
 ```text
 llm-notes/
 ├── llm_notes/
+│   ├── compile.py
 │   ├── manifest.py
-│   └── search.py
+│   ├── search.py
+│   └── wiki.py
 ├── skills/
 │   ├── kb-init/
 │   ├── kb-compile/
@@ -141,8 +143,10 @@ llm-notes/
 │   ├── kb-viz/
 │   └── kb-search/
 ├── tests/
+│   ├── test_compile.py
 │   ├── test_manifest.py
-│   └── test_search.py
+│   ├── test_search.py
+│   └── test_wiki.py
 ├── pyproject.toml
 ├── install.sh
 ├── README.md

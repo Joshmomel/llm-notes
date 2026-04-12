@@ -55,7 +55,7 @@ cd llm-notes
 ./install.sh
 ```
 
-`install.sh` symlinks the skills in this repository into `~/.claude/skills/` and installs the local `llm_notes` Python helper package in editable mode. That package backs stable search and manifest helpers, so `/kb-search` no longer depends on generating an ad hoc script body inside each vault.
+`install.sh` symlinks the skills in this repository into `~/.claude/skills/` and installs the local `llm_notes` Python helper package in editable mode. That package now backs stable search, manifest, compile-planning, and wiki/index helpers, so core KB behavior can move out of ad hoc skill text and into versioned local code.
 
 ## Quick Start
 
@@ -167,8 +167,10 @@ Important detail: in the current implementation, source files live directly in t
 ```text
 llm-notes/
 ├── llm_notes/
+│   ├── compile.py
 │   ├── manifest.py
-│   └── search.py
+│   ├── search.py
+│   └── wiki.py
 ├── skills/
 │   ├── kb-init/
 │   ├── kb-compile/
@@ -178,8 +180,10 @@ llm-notes/
 │   ├── kb-viz/
 │   └── kb-search/
 ├── tests/
+│   ├── test_compile.py
 │   ├── test_manifest.py
-│   └── test_search.py
+│   ├── test_search.py
+│   └── test_wiki.py
 ├── pyproject.toml
 ├── install.sh
 ├── README.md

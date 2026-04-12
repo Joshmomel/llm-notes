@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -84,7 +85,7 @@ def source_digest(path: str | Path) -> str:
 
 
 def _relative_to_root(path: str | Path, kb_root: str | Path) -> str:
-    return str(Path(path).resolve().relative_to(Path(kb_root).resolve()))
+    return Path(os.path.relpath(Path(path).resolve(), Path(kb_root).resolve())).as_posix()
 
 
 def tracked_sources(manifest: dict[str, Any]) -> set[str]:

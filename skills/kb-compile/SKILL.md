@@ -52,6 +52,17 @@ To check what's already compiled:
 
 If nothing to compile, inform the user.
 
+Preferred deterministic entrypoint:
+
+```bash
+python3 -m llm_notes.compile plan --kb-root <kb-root> --json
+```
+
+Use the JSON result to drive the rest of the compile workflow:
+- `new_sources` and `stale_sources` are the sources that need attention
+- `unchanged_sources` can be skipped
+- `manifest_in_use` tells you whether the plan came from `outputs/_manifest.json` or a fallback scan of existing article `sources:`
+
 ### Step 3: Read and Classify
 
 For each source file:
@@ -136,6 +147,16 @@ After writing the article:
 5. **Manifest** — Update `outputs/_manifest.json`:
    - For every compiled source, store its relative path, content digest, source mtime, compile timestamp, and destination wiki articles
    - Keep the manifest deterministic and machine-readable so later `/kb-compile` and `/kb-lint` runs can diff source changes without reparsing every article
+
+Preferred deterministic entrypoints after article writes:
+
+```bash
+python3 -m llm_notes.compile record --kb-root <kb-root> --source <source-path> --article <wiki/article.md>
+python3 -m llm_notes.compile sync-indexes --kb-root <kb-root>
+```
+
+- Run `record` once per compiled source, repeating `--article` when a source contributes to multiple articles
+- Run `sync-indexes` after the batch so `_index.md` files reflect the current article tree
 
 ### Step 6: Report
 
