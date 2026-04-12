@@ -16,17 +16,17 @@ _AGENTS_MD_SECTION = """\
 This directory is an `llm-notes` knowledge base.
 
 Rules:
-- For knowledge-oriented questions, save the answer note first with `python3 -m llm_notes.answers save --kb-root . ...`.
-- If the answer is reusable synthesis, immediately promote it with `python3 -m llm_notes.answers file --kb-root . --answer <path> --mode auto`.
+- For knowledge-oriented questions, prefer the single-step finisher: `python3 -m llm_notes.answers finalize --kb-root . ...`.
+- `finalize` saves the answer note, auto-files reusable synthesis, and refreshes `outputs/lint-report.md`.
 - Treat `outputs/answers/` as the audit layer, not as canonical source material. When filing back into the wiki, prefer canonical source files and existing wiki articles.
-- If an answer remains pending instead of being filed, refresh the queue with `python3 -m llm_notes.lint --kb-root .`.
+- If a pending answer still needs semantic review, refresh the semantic shortlist with `python3 -m llm_notes.semantic_lint --kb-root .`.
 """
 
 _HOOK_CONTEXT = (
     "llm-notes: This is a knowledge-base repo. For knowledge-oriented work, save answers to "
-    "outputs/answers with `python3 -m llm_notes.answers save`, then promote reusable synthesis "
-    "with `python3 -m llm_notes.answers file --mode auto`. Prefer canonical sources over outputs "
-    "when updating the wiki."
+    "outputs/answers with `python3 -m llm_notes.answers finalize`. That command also auto-files "
+    "reusable synthesis and refreshes lint state. Prefer canonical sources over outputs when "
+    "updating the wiki."
 )
 
 _CODEX_HOOK = {
@@ -39,7 +39,7 @@ _CODEX_HOOK = {
                         "type": "command",
                         "command": (
                             "[ -d wiki ] && "
-                            + r"""echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"},"systemMessage":"llm-notes: This is a knowledge-base repo. For knowledge-oriented work, save answers to outputs/answers with `python3 -m llm_notes.answers save`, then promote reusable synthesis with `python3 -m llm_notes.answers file --mode auto`. Prefer canonical sources over outputs when updating the wiki."}' """
+                            + r"""echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"},"systemMessage":"llm-notes: This is a knowledge-base repo. For knowledge-oriented work, save answers to outputs/answers with `python3 -m llm_notes.answers finalize`. That command also auto-files reusable synthesis and refreshes lint state. Prefer canonical sources over outputs when updating the wiki."}' """
                             + "|| true"
                         ),
                     }

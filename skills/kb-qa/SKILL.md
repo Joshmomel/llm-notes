@@ -119,14 +119,15 @@ filed_to_wiki: false
 
 The short answer shown to the user in chat should mirror the same four sections, even if abbreviated.
 
-Prefer the deterministic helper instead of hand-editing answer frontmatter yourself:
+Prefer the deterministic finisher helper instead of manually chaining save/file/lint steps yourself:
 
 ```bash
-python3 -m llm_notes.answers save \
+python3 -m llm_notes.answers finalize \
   --kb-root <kb-root> \
   --question "<full question>" \
   --source-consulted wiki/category/article.md \
   --source-consulted wiki/category/other-article.md \
+  --mode auto \
   --body-stdin <<'EOF'
 # <Question>
 
@@ -156,11 +157,11 @@ python3 -m llm_notes.answers save \
 EOF
 ```
 
-Default behavior: always save the answer note first. `outputs/answers/` is the audit layer for KB Q&A.
+Default behavior: `finalize` saves the answer note into `outputs/answers/`, auto-files reusable synthesis when appropriate, and refreshes `outputs/lint-report.md`.
 
 ### Step 5: Offer to File Back
 
-After saving the answer, decide whether it should be promoted into the wiki:
+If you cannot use `finalize`, then decide manually whether the saved answer should be promoted into the wiki:
 
 - Auto-file by default when the answer is clearly reusable synthesis:
   - it combines 2 or more sources
@@ -172,7 +173,7 @@ After saving the answer, decide whether it should be promoted into the wiki:
   - answers that mostly repeat one existing article
 - If the destination article is ambiguous or filing would be risky, ask the user before filing.
 
-Prefer the deterministic filing helper:
+Manual filing helper:
 
 ```bash
 python3 -m llm_notes.answers file \

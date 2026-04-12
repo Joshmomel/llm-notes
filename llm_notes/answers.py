@@ -535,6 +535,87 @@ def mark_answer_filed(
     return answer.path
 
 
+def finalize_answer(
+    kb_root: str | Path,
+    *,
+    question: str,
+    body: str,
+    title: str | None = None,
+    answer_date: str | None = None,
+    sources_consulted: list[str] | None = None,
+    metadata: dict[str, Any] | None = None,
+    auto_file: bool = True,
+    file_mode: str = "auto",
+    article: str | None = None,
+    category: str | None = None,
+    slug: str | None = None,
+    tags: list[str] | None = None,
+    refresh_lint: bool = True,
+    refresh_semantic_candidates: bool = False,
+) -> dict[str, Any]:
+    root = Path(kb_root).resolve()
+    answer_path = save_answer(
+        root,
+        question=question,
+        body=body,
+        title=title,
+        answer_date=answer_date,
+        sources_consulted=sources_consulted,
+        metadata=metadata,
+    )
+    answer = parse_answer(answer_path, root)
+    assessment = assess_answer_for_filing(answer)
+
+    filing_result: dict[str, Any] | None = None
+    should_attempt_file = auto_file and (
+        assessment.should_file
+        or file_mode != "auto"
+        or bool(article)
+        or bool(answer.promotion_mode)
+        or bool(answer.promotion_targets)
+    )
+    if should_attempt_file:
+        filing_result = file_answer(
+            root,
+            answer_path=answer_path,
+            mode=file_mode,
+            article=article,
+            title=title,
+            category=category,
+            slug=slug,
+            tags=tags,
+        )
+
+    lint_result: dict[str, Any] | None = None
+    if refresh_lint:
+        from llm_notes.lint import write_report
+
+        lint_result = write_report(root)
+
+    semantic_result: dict[str, Any] | None = None
+    if refresh_semantic_candidates:
+        from llm_notes.semantic_lint import write_semantic_candidates
+
+        semantic_result = write_semantic_candidates(root)
+
+    final_answer = parse_answer(answer_path, root)
+    return {
+        "answer_path": str(answer_path),
+        "answer_rel_path": final_answer.rel_path,
+        "filed_to_wiki": final_answer.filed_to_wiki,
+        "filing_status": final_answer.filing_status,
+        "filed_wikilinks": final_answer.filed_wikilinks,
+        "assessment": {
+            "score": assessment.score,
+            "should_file": assessment.should_file,
+            "reasons": assessment.reasons,
+        },
+        "filing_result": filing_result,
+        "lint_result": lint_result,
+        "semantic_result": semantic_result,
+    }
+
+
 def file_answer(
     kb_root: str | Path,
     *,
@@ -634,6 +715,28 @@ def main(argv: list[str] | None = None) -> int:
     save_body.add_argument("--body-file")
     save_body.add_argument("--body-stdin", action="store_true")
 
+    finalize_parser = subparsers.add_parser(
+        "finalize",
+        help="save an answer, auto-file reusable synthesis, and refresh lint state",
+    )
+    finalize_parser.add_argument("--kb-root")
+    finalize_parser.add_argument("--question", required=True)
+    finalize_parser.add_argument("--title")
+    finalize_parser.add_argument("--date")
+    finalize_parser.add_argument("--source-consulted", action="append", default=[])
+    finalize_parser.add_argument("--metadata-json")
+    finalize_parser.add_argument("--mode", choices=("auto", "new", "enrich"), default="auto")
+    finalize_parser.add_argument("--article")
+    finalize_parser.add_argument("--category")
+    finalize_parser.add_argument("--slug")
+    finalize_parser.add_argument("--tag", action="append", default=[])
+    finalize_parser.add_argument("--no-auto-file", action="store_true")
+    finalize_parser.add_argument("--no-refresh-lint", action="store_true")
+    finalize_parser.add_argument("--refresh-semantic-candidates", action="store_true")
+    finalize_body = finalize_parser.add_mutually_exclusive_group(required=True)
+    finalize_body.add_argument("--body-file")
+    finalize_body.add_argument("--body-stdin", action="store_true")
+
     file_parser = subparsers.add_parser("file", help="promote an answer note into the wiki")
     file_parser.add_argument("--kb-root")
     file_parser.add_argument("--answer", required=True)
@@ -674,6 +777,34 @@ def main(argv: list[str] | None = None) -> int:
                 indent=2,
             )
         )
+        return 0
+
+    if args.command == "finalize":
+        metadata = json.loads(args.metadata_json) if args.metadata_json else None
+        if args.body_file:
+            body = Path(args.body_file).read_text(encoding="utf-8")
+        else:
+            import sys
+
+            body = sys.stdin.read()
+        result = finalize_answer(
+            kb_root,
+            question=args.question,
+            body=body,
+            title=args.title,
+            answer_date=args.date,
+            sources_consulted=args.source_consulted,
+            metadata=metadata,
+            auto_file=not args.no_auto_file,
+            file_mode=args.mode,
+            article=args.article,
+            category=args.category,
+            slug=args.slug,
+            tags=args.tag,
+            refresh_lint=not args.no_refresh_lint,
+            refresh_semantic_candidates=args.refresh_semantic_candidates,
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
 
     if args.command == "file":
