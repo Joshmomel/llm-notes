@@ -60,6 +60,7 @@ python3 -m llm_notes.compile plan --kb-root <kb-root> --json
 ```
 
 Use the JSON result to drive the rest of the compile workflow:
+- `plan_version` is the JSON contract version for compile planning
 - `new_sources` and `stale_sources` are the sources that need attention
 - `unchanged_sources` can be skipped
 - `impacted_articles` are existing wiki articles that should be revisited because one of their sources changed
@@ -69,6 +70,9 @@ Use the JSON result to drive the rest of the compile workflow:
 Interpret `planned_articles` as follows:
 - `action: "refresh"` — prefer updating that existing article instead of inventing a new target
 - `action: "create"` — use the suggested `title`, `category`, and `slug` as the default new article target unless the source clearly supports a better boundary
+- `planning_basis: "linked_article"` means the target came from an existing source->article link already tracked in the manifest/wiki
+- `planning_basis: "path_default"` means the target is just the deterministic default derived from the source path and filename
+- `override_ok: true` means you may override the planned target, but only with an explicit reason grounded in the source content
 
 Do **not** ignore the plan and freestyle the article map from scratch. The plan is the default structure. Only override it when the source content makes the default target clearly wrong, too broad, or too narrow.
 

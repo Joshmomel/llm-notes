@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 from llm_notes.manifest import (
+    backfill_article_entries,
     tracked_articles,
     load_manifest,
     manifest_path,
@@ -111,6 +112,45 @@ class ManifestTests(unittest.TestCase):
             self.assertEqual(entry["source_refs"], ["notes.md"])
             self.assertIn("notes.md", entry["source_digests"])
             self.assertEqual(entry["metadata"]["planner"], "compile")
+
+    def test_backfill_article_entries_upgrades_source_only_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            kb_root = Path(tmpdir)
+            (kb_root / "wiki" / "ml").mkdir(parents=True)
+            source = kb_root / "notes.md"
+            article = kb_root / "wiki" / "ml" / "attention.md"
+            source.write_text("# Title\n\nBody", encoding="utf-8")
+            article.write_text(
+                "---\n"
+                'title: "Attention"\n'
+                "created: 2026-04-11\n"
+                "updated: 2026-04-11\n"
+                "sources:\n"
+                "  - notes.md\n"
+                "tags: [attention]\n"
+                "---\n\n"
+                "Body\n",
+                encoding="utf-8",
+            )
+
+            manifest = {
+                "version": 1,
+                "updated_at": None,
+                "sources": {
+                    "notes.md": {
+                        "digest": source_digest(source),
+                        "mtime_ns": source.stat().st_mtime_ns,
+                        "compiled_at": "2026-04-12T00:00:00+00:00",
+                        "articles": ["wiki/ml/attention.md"],
+                    }
+                },
+            }
+
+            changed = backfill_article_entries(manifest, kb_root)
+            self.assertTrue(changed)
+            self.assertIn("wiki/ml/attention.md", manifest["articles"])
+            self.assertEqual(manifest["articles"]["wiki/ml/attention.md"]["source_refs"], ["notes.md"])
+            self.assertEqual(manifest["articles"]["wiki/ml/attention.md"]["wikilink"], "ml/attention")
 
 
 if __name__ == "__main__":

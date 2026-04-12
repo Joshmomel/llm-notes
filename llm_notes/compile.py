@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Iterable
 
 from llm_notes.manifest import (
+    backfill_article_entries,
     load_manifest,
     manifest_path,
     save_manifest,
@@ -54,6 +55,9 @@ DOCUMENT_EXTENSIONS = {".md", ".rst", ".txt"}
 PAPER_EXTENSIONS = {".pdf"}
 IMAGE_EXTENSIONS = {".gif", ".jpeg", ".jpg", ".png", ".svg", ".webp"}
 SUPPORTED_EXTENSIONS = CODE_EXTENSIONS | DOCUMENT_EXTENSIONS | PAPER_EXTENSIONS | IMAGE_EXTENSIONS
+PLAN_VERSION = 1
+PLAN_ACTION_CREATE = "create"
+PLAN_ACTION_REFRESH = "refresh"
 
 SKIP_DIR_NAMES = {
     ".cursor",
@@ -106,6 +110,8 @@ class ImpactedArticle:
 @dataclass(frozen=True)
 class ArticlePlan:
     action: str
+    planning_basis: str
+    override_ok: bool
     article_path: str
     wikilink: str
     title: str
@@ -327,6 +333,7 @@ def build_compilation_plan(
     root = Path(kb_root).resolve()
     manifest = load_manifest(root)
     inventory = article_inventory(root)
+    backfill_article_entries(manifest, root, inventory=inventory)
     sources = discover_sources(root, explicit_targets=explicit_targets)
     manifest_in_use = manifest_path(root).exists()
     compiled_refs = set(manifest.get("sources", {})) if manifest_in_use else compiled_source_refs_from_wiki(root)
@@ -375,7 +382,9 @@ def build_compilation_plan(
                     plan = planned_index.setdefault(
                         descriptor["article_path"],
                         {
-                            "action": "refresh",
+                            "action": PLAN_ACTION_REFRESH,
+                            "planning_basis": "linked_article",
+                            "override_ok": True,
                             **descriptor,
                             "source_rel_paths": set(),
                             "reasons": set(),
@@ -389,7 +398,9 @@ def build_compilation_plan(
             plan = planned_index.setdefault(
                 descriptor["article_path"],
                 {
-                    "action": "create",
+                    "action": PLAN_ACTION_CREATE,
+                    "planning_basis": "path_default",
+                    "override_ok": True,
                     **descriptor,
                     "source_rel_paths": set(),
                     "reasons": set(),
@@ -418,6 +429,8 @@ def build_compilation_plan(
         planned_articles=[
             ArticlePlan(
                 action=str(payload["action"]),
+                planning_basis=str(payload["planning_basis"]),
+                override_ok=bool(payload["override_ok"]),
                 article_path=article_path,
                 wikilink=str(payload["wikilink"]),
                 title=str(payload["title"]),
@@ -445,6 +458,7 @@ def record_compilation(
 ) -> Path:
     root = Path(kb_root).resolve()
     manifest = load_manifest(root)
+    backfill_article_entries(manifest, root, inventory=article_inventory(root))
     normalized_articles = sorted({_normalize_kb_relative(path, root) for path in article_paths})
 
     for source in source_paths:
@@ -541,6 +555,7 @@ def _resolved_kb_root(kb_root: str | Path | None) -> Path:
 
 def _plan_to_jsonable(plan: CompilationPlan) -> dict:
     payload = asdict(plan)
+    payload["plan_version"] = PLAN_VERSION
     for key in ("all_sources", "new_sources", "stale_sources", "unchanged_sources"):
         payload[key] = [
             {
@@ -587,7 +602,7 @@ def _print_plan(plan: CompilationPlan) -> None:
         print("Planned article actions:")
         for article in plan.planned_articles:
             print(
-                f"  - {article.action}: {article.article_path} <- "
+                f"  - {article.action}/{article.planning_basis}: {article.article_path} <- "
                 f"{', '.join(article.source_rel_paths)}"
             )
 

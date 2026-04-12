@@ -18,7 +18,7 @@
 | 命令            | 作用                                                                              |
 | ------------- | ------------------------------------------------------------------------------- |
 | `/kb-init`    | 初始化知识库目录，创建 `wiki/`、`outputs/`、`CLAUDE.md` 和基础索引；如果目录已有内容，会自动编译现有材料             |
-| `/kb-compile` | 读取知识库根目录中的源材料，生成或更新结构化 wiki 文章，并维护 `_index.md`、`_glossary.md`、`_recent.md`      |
+| `/kb-compile` | 读取知识库根目录中的源材料，先计算确定性的 source/article 编译计划，再生成或更新结构化 wiki 文章，并维护 `_index.md`、`_glossary.md`、`_recent.md` |
 | `/kb-chat`    | 开启多轮 KB 对话，把完整对话轨迹保存到 `outputs/sessions/`，在同一会话里承接 follow-up，并把稳定结论沉淀回答案或 wiki |
 | `/kb-qa`      | 基于现有 wiki 回答问题，优先复用 `/kb-search` 的 TF-IDF 索引召回候选文章，并沿相关概念延伸知识网络；在覆盖不足时回读源文件，将答案保存到 `outputs/answers/`，并可选择回填到 wiki |
 | `/kb-lint`    | 执行健康检查，识别孤立文章、失效 wikilinks、过时内容和未覆盖源文件，将报告保存到 `outputs/lint-report.md`，并自动修复安全项 |
@@ -56,7 +56,7 @@ cd llm-notes
 ./install.sh
 ```
 
-`install.sh` 会将仓库中的 skill 目录软链接到 `~/.claude/skills/`，并以 editable 模式安装本地 `llm_notes` Python 辅助包。现在这层实现已经覆盖 search、manifest、compile planning 和 wiki/index helpers，因此核心 KB 行为可以逐步从 skill 文本约定迁到仓库内可版本化的本地代码。
+`install.sh` 会将仓库中的 skill 目录软链接到 `~/.claude/skills/`，并以 editable 模式安装本地 `llm_notes` Python 辅助包。现在这层实现已经覆盖 search、manifest、source/article compile planning 和 wiki/index helpers，因此核心 KB 行为可以逐步从 skill 文本约定迁到仓库内可版本化的本地代码。
 
 ## 快速开始
 
@@ -137,6 +137,12 @@ your-kb/
 ```
 
 重要说明：当前实现中，源文件直接保存在知识库根目录；`llm-notes` **不要求单独的 `raw/` 目录**。
+
+`outputs/_manifest.json` 现在会同时跟踪编译状态的两侧：
+- `sources` 记录源文件 digest、mtime 和目标 wiki 文章
+- `articles` 记录文章的 title/category/slug，以及上次编译时使用的 source refs 和 source digests
+
+这使 `/kb-compile` 不只能判断“哪些源文件变了”，还可以进一步判断“哪些既有文章受影响”以及“默认应该新建或刷新哪篇文章”。
 
 ## 仓库结构
 

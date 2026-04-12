@@ -82,6 +82,10 @@ class CompileTests(unittest.TestCase):
                 [(item.action, item.article_path) for item in plan.planned_articles],
                 [("create", "wiki/fresh.md"), ("refresh", "wiki/ml/stale.md")],
             )
+            self.assertEqual(
+                [(item.action, item.planning_basis, item.override_ok) for item in plan.planned_articles],
+                [("create", "path_default", True), ("refresh", "linked_article", True)],
+            )
             self.assertTrue(plan.manifest_in_use)
 
     def test_build_compilation_plan_falls_back_to_article_sources(self) -> None:
@@ -226,9 +230,12 @@ class CompileTests(unittest.TestCase):
 
             payload = json.loads(buffer.getvalue())
             self.assertEqual(exit_code, 0)
+            self.assertEqual(payload["plan_version"], 1)
             self.assertEqual(payload["new_sources"][0]["rel_path"], "notes.md")
             self.assertEqual(payload["all_sources"][0]["kind"], "document")
             self.assertEqual(payload["planned_articles"][0]["action"], "create")
+            self.assertEqual(payload["planned_articles"][0]["planning_basis"], "path_default")
+            self.assertTrue(payload["planned_articles"][0]["override_ok"])
 
     def test_main_requires_existing_wiki_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -1,4 +1,4 @@
-"""Manifest helpers for tracking compiled knowledge-base sources."""
+"""Manifest helpers for tracking compiled knowledge-base sources and articles."""
 
 from __future__ import annotations
 
@@ -104,6 +104,13 @@ def tracked_articles(manifest: dict[str, Any]) -> set[str]:
     return set(articles)
 
 
+def _normalize_article_ref(article_ref: str | Path) -> str:
+    ref = Path(article_ref).as_posix().lstrip("./")
+    if ref.startswith("wiki/"):
+        return ref
+    return f"wiki/{ref}"
+
+
 def get_source_entry(
     manifest: dict[str, Any],
     kb_root: str | Path,
@@ -165,6 +172,7 @@ def update_article_entry(
     title: str | None = None,
     category: str | None = None,
     slug: str | None = None,
+    compiled_at: str | None = None,
 ) -> dict[str, Any]:
     root = Path(kb_root).resolve()
     rel_path = _relative_to_root(article_path, root)
@@ -192,7 +200,7 @@ def update_article_entry(
     }
 
     entry: dict[str, Any] = {
-        "compiled_at": _now_iso(),
+        "compiled_at": compiled_at or (existing.get("compiled_at") if isinstance(existing, dict) else None) or _now_iso(),
         "title": title or (existing.get("title") if isinstance(existing, dict) else None) or derived_slug.replace("-", " ").title(),
         "category": category if category is not None else (existing.get("category") if isinstance(existing, dict) else None) or derived_category,
         "slug": slug or (existing.get("slug") if isinstance(existing, dict) else None) or derived_slug,
@@ -208,6 +216,68 @@ def update_article_entry(
 
     manifest.setdefault("articles", {})[rel_path] = entry
     return entry
+
+
+def backfill_article_entries(
+    manifest: dict[str, Any],
+    kb_root: str | Path,
+    *,
+    inventory: dict[str, Any] | None = None,
+) -> bool:
+    """Backfill article entries from source mappings and wiki inventory.
+
+    Older manifests tracked only source-side data. This helper reconstructs
+    article-side metadata in memory so planning can reason about impacted
+    articles even before the next successful write persists the upgraded
+    manifest layout.
+    """
+
+    root = Path(kb_root).resolve()
+    if inventory is None:
+        from llm_notes.wiki import article_inventory
+
+        inventory = article_inventory(root)
+
+    by_article = inventory.get("by_article", {}) if isinstance(inventory, dict) else {}
+    changed = False
+
+    for source_rel_path, source_entry in sorted(manifest.get("sources", {}).items()):
+        if not isinstance(source_entry, dict):
+            continue
+        for article_ref in source_entry.get("articles", []):
+            normalized_article_ref = _normalize_article_ref(article_ref)
+            wiki_rel_path = normalized_article_ref.removeprefix("wiki/")
+            inventory_entry = by_article.get(wiki_rel_path, {}) if isinstance(by_article, dict) else {}
+            before = manifest.get("articles", {}).get(normalized_article_ref)
+            update_article_entry(
+                manifest,
+                root,
+                root / normalized_article_ref,
+                source_paths=[root / source_rel_path],
+                title=inventory_entry.get("title") if isinstance(inventory_entry, dict) else None,
+                category=inventory_entry.get("category") if isinstance(inventory_entry, dict) else None,
+                slug=inventory_entry.get("slug") if isinstance(inventory_entry, dict) else None,
+            )
+            if manifest.get("articles", {}).get(normalized_article_ref) != before:
+                changed = True
+
+    if isinstance(by_article, dict):
+        for wiki_rel_path, inventory_entry in sorted(by_article.items()):
+            normalized_article_ref = _normalize_article_ref(wiki_rel_path)
+            before = manifest.get("articles", {}).get(normalized_article_ref)
+            update_article_entry(
+                manifest,
+                root,
+                root / normalized_article_ref,
+                source_paths=[root / source_rel for source_rel in inventory_entry.get("sources", [])],
+                title=inventory_entry.get("title"),
+                category=inventory_entry.get("category"),
+                slug=inventory_entry.get("slug"),
+            )
+            if manifest.get("articles", {}).get(normalized_article_ref) != before:
+                changed = True
+
+    return changed
 
 
 def source_is_stale(
