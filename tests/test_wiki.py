@@ -52,6 +52,7 @@ class WikiTests(unittest.TestCase):
 
             inventory = article_inventory(kb_root)
             self.assertEqual(inventory["by_source"]["notes/a.md"], ["ml/attention.md"])
+            self.assertEqual(inventory["by_article"]["ml/attention.md"]["wikilink"], "ml/attention")
 
     def test_sync_indexes_writes_category_and_master_indexes(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

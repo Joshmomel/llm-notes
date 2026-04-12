@@ -19,6 +19,7 @@ trigger: /kb-compile
 # /kb-compile — Compile Source Material into Wiki
 
 Reads source material and compiles it into structured wiki articles.
+Use the deterministic compile plan first, then let the LLM refine article boundaries.
 
 ## Usage
 
@@ -61,15 +62,29 @@ python3 -m llm_notes.compile plan --kb-root <kb-root> --json
 Use the JSON result to drive the rest of the compile workflow:
 - `new_sources` and `stale_sources` are the sources that need attention
 - `unchanged_sources` can be skipped
+- `impacted_articles` are existing wiki articles that should be revisited because one of their sources changed
+- `planned_articles` are the default article actions inferred from the current manifest and wiki inventory
 - `manifest_in_use` tells you whether the plan came from `outputs/_manifest.json` or a fallback scan of existing article `sources:`
+
+Interpret `planned_articles` as follows:
+- `action: "refresh"` — prefer updating that existing article instead of inventing a new target
+- `action: "create"` — use the suggested `title`, `category`, and `slug` as the default new article target unless the source clearly supports a better boundary
+
+Do **not** ignore the plan and freestyle the article map from scratch. The plan is the default structure. Only override it when the source content makes the default target clearly wrong, too broad, or too narrow.
 
 ### Step 3: Read and Classify
 
-For each source file:
-1. Read the file content
-2. Determine topics, concepts, and tags
-3. Read `wiki/_index.md` to find existing related categories and articles
-4. Decide: create a new article, or enrich an existing one?
+Work article-by-article, not file-by-file:
+1. Group the changed sources by `planned_articles[*].article_path`
+2. For each planned article action:
+   - If `refresh`, read the existing article first, then read the linked changed sources
+   - If `create`, read the grouped sources and use the suggested target as the default draft destination
+3. Read `wiki/_index.md` only as supporting context for related categories/articles, not as the primary planning mechanism
+4. Determine topics, concepts, and tags for the grouped source set
+5. Confirm whether the planned target still holds:
+   - keep the planned target when it is directionally correct
+   - split the article only if the grouped sources obviously cover multiple independent concepts
+   - merge into a different existing article only if the planned target would cause duplication
 
 ### Step 4: Write Wiki Article
 
@@ -118,7 +133,18 @@ For research sources: summarize findings, key concepts, methodologies.
 Preferred deterministic article write:
 
 1. Draft the article body content first, excluding YAML frontmatter.
-2. Write it through the local helper instead of hand-editing article metadata and bookkeeping files yourself:
+2. Write it through the local helper instead of hand-editing article metadata and bookkeeping files yourself.
+3. When refreshing an existing article, reuse the article's current `category` / `slug` unless you have a strong reason to restructure it.
+4. When creating a new article, prefer the planned `title` / `category` / `slug` from `planned_articles`.
+
+Example refresh flow:
+
+```bash
+python3 -m llm_notes.compile plan --kb-root <kb-root> --json
+# inspect planned_articles -> refresh wiki/ml/attention.md from notes/attention.md
+```
+
+Then write:
 
 ```bash
 python3 -m llm_notes.compile write-article \
@@ -154,7 +180,7 @@ The helper will:
 - write or update the target wiki article
 - preserve `created` on existing articles and refresh `updated`
 - merge `sources` and `tags`
-- update `outputs/_manifest.json`
+- update `outputs/_manifest.json` source entries and article entries
 - prepend a standardized `_recent.md` entry
 - sync category and master indexes
 
@@ -189,6 +215,7 @@ After writing the article:
 
 5. **Manifest** — Update `outputs/_manifest.json`:
    - For every compiled source, store its relative path, content digest, source mtime, compile timestamp, and destination wiki articles
+   - For every compiled wiki article, store its relative path, title/category/slug, source refs, and the source digests used for the last compile
    - Keep the manifest deterministic and machine-readable so later `/kb-compile` and `/kb-lint` runs can diff source changes without reparsing every article
 
 Fallback deterministic entrypoints after manual article writes:
@@ -203,4 +230,5 @@ python3 -m llm_notes.compile sync-indexes --kb-root <kb-root>
 After compilation, print:
 - How many sources were compiled
 - Which wiki articles were created or updated
+- Which planned article actions were followed or intentionally overridden
 - Any open questions or suggested follow-ups

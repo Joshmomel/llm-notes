@@ -18,7 +18,7 @@ Unlike workflows that require a `raw/` + `wiki/` layout, the current implementat
 | Command       | Purpose                                                                                                                                                                         |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/kb-init`    | Initialize a knowledge base directory, create `wiki/`, `outputs/`, `CLAUDE.md`, and starter indexes, and auto-compile existing material when present                            |
-| `/kb-compile` | Read source material from the KB root, create or update structured wiki articles, and maintain `_index.md`, `_glossary.md`, and `_recent.md`                                    |
+| `/kb-compile` | Read source material from the KB root, compute a deterministic source/article plan, create or update structured wiki articles, and maintain `_index.md`, `_glossary.md`, and `_recent.md` |
 | `/kb-chat`    | Run a multi-turn KB conversation, keep the transcript in `outputs/sessions/`, continue follow-up questions inside one session, and promote stable conclusions into answers/wiki |
 | `/kb-qa`      | Answer questions against the wiki, reuse `/kb-search`'s TF-IDF index to shortlist relevant articles, extend the local knowledge network through related concepts, fall back to source files when coverage is insufficient, save answers to `outputs/answers/`, and optionally file insights back into the wiki |
 | `/kb-lint`    | Run health checks, identify orphan articles, broken wikilinks, stale content, and uncovered sources, save a report to `outputs/lint-report.md`, and auto-fix safe issues        |
@@ -56,7 +56,7 @@ cd llm-notes
 ./install.sh
 ```
 
-`install.sh` symlinks the skills in this repository into `~/.claude/skills/` and installs the local `llm_notes` Python helper package in editable mode. That package now backs stable search, manifest, compile-planning, and wiki/index helpers, so core KB behavior can move out of ad hoc skill text and into versioned local code.
+`install.sh` symlinks the skills in this repository into `~/.claude/skills/` and installs the local `llm_notes` Python helper package in editable mode. That package now backs stable search, manifest, source/article compile-planning, and wiki/index helpers, so core KB behavior can move out of ad hoc skill text and into versioned local code.
 
 ## Quick Start
 
@@ -175,6 +175,12 @@ your-kb/
 ```
 
 Important detail: in the current implementation, source files live directly in the KB root. `llm-notes` does **not** require a separate `raw/` directory.
+
+`outputs/_manifest.json` now tracks both sides of compilation state:
+- `sources` records source digests, mtimes, and destination wiki articles
+- `articles` records article title/category/slug plus the source refs and source digests used for the last compile
+
+That lets `/kb-compile` reason about not just which source files changed, but which existing articles are impacted and which new article targets are the default next step.
 
 ## Repository Layout
 

@@ -1,4 +1,4 @@
-"""Source discovery and manifest-driven compile planning for llm-notes."""
+"""Source discovery and manifest-driven source/article planning for llm-notes."""
 
 from __future__ import annotations
 
@@ -10,8 +10,15 @@ from datetime import date
 from pathlib import Path
 from typing import Iterable
 
-from llm_notes.manifest import load_manifest, manifest_path, save_manifest, source_is_stale, update_source_entry
-from llm_notes.wiki import article_inventory, prepend_recent_entry, sync_indexes, write_article
+from llm_notes.manifest import (
+    load_manifest,
+    manifest_path,
+    save_manifest,
+    source_is_stale,
+    update_article_entry,
+    update_source_entry,
+)
+from llm_notes.wiki import article_inventory, prepend_recent_entry, slugify, sync_indexes, write_article
 
 CODE_EXTENSIONS = {
     ".c",
@@ -79,8 +86,33 @@ class CompilationPlan:
     new_sources: list[SourceRecord]
     stale_sources: list[SourceRecord]
     unchanged_sources: list[SourceRecord]
+    impacted_articles: list["ImpactedArticle"]
+    planned_articles: list["ArticlePlan"]
     compiled_source_refs: set[str]
     manifest_in_use: bool
+
+
+@dataclass(frozen=True)
+class ImpactedArticle:
+    article_path: str
+    wikilink: str
+    title: str
+    category: str
+    slug: str
+    source_rel_paths: list[str]
+    reasons: list[str]
+
+
+@dataclass(frozen=True)
+class ArticlePlan:
+    action: str
+    article_path: str
+    wikilink: str
+    title: str
+    category: str
+    slug: str
+    source_rel_paths: list[str]
+    reasons: list[str]
 
 
 def find_kb_root(start: str | Path = ".") -> Path | None:
@@ -177,12 +209,124 @@ def compiled_source_refs_from_wiki(kb_root: str | Path) -> set[str]:
     return set(inventory["by_source"])
 
 
+def _root_relative_article_ref(article_ref: str | Path) -> str:
+    ref = Path(article_ref).as_posix().lstrip("./")
+    if ref.startswith("wiki/"):
+        return ref
+    return f"wiki/{ref}"
+
+
+def _article_descriptor(
+    article_ref: str | Path,
+    manifest: dict,
+    inventory: dict,
+) -> dict[str, str]:
+    root_relative = _root_relative_article_ref(article_ref)
+    wiki_relative = root_relative.removeprefix("wiki/")
+    manifest_entry = manifest.get("articles", {}).get(root_relative)
+    inventory_entry = inventory.get("by_article", {}).get(wiki_relative)
+
+    slug = (
+        manifest_entry.get("slug")
+        if isinstance(manifest_entry, dict) and manifest_entry.get("slug")
+        else inventory_entry.get("slug")
+        if isinstance(inventory_entry, dict) and inventory_entry.get("slug")
+        else Path(wiki_relative).stem
+    )
+    category = (
+        manifest_entry.get("category")
+        if isinstance(manifest_entry, dict) and manifest_entry.get("category") is not None
+        else inventory_entry.get("category")
+        if isinstance(inventory_entry, dict) and inventory_entry.get("category") is not None
+        else "/".join(Path(wiki_relative).parts[:-1])
+    )
+    title = (
+        manifest_entry.get("title")
+        if isinstance(manifest_entry, dict) and manifest_entry.get("title")
+        else inventory_entry.get("title")
+        if isinstance(inventory_entry, dict) and inventory_entry.get("title")
+        else slug.replace("-", " ").title()
+    )
+    wikilink = (
+        manifest_entry.get("wikilink")
+        if isinstance(manifest_entry, dict) and manifest_entry.get("wikilink")
+        else inventory_entry.get("wikilink")
+        if isinstance(inventory_entry, dict) and inventory_entry.get("wikilink")
+        else wiki_relative.removesuffix(".md")
+    )
+    return {
+        "article_path": root_relative,
+        "wikilink": wikilink,
+        "title": title,
+        "category": category,
+        "slug": slug,
+    }
+
+
+def _linked_article_refs(source_rel_path: str, manifest: dict, inventory: dict) -> list[str]:
+    refs: set[str] = set()
+    source_entry = manifest.get("sources", {}).get(source_rel_path)
+    if isinstance(source_entry, dict):
+        refs.update(
+            _root_relative_article_ref(article_ref)
+            for article_ref in source_entry.get("articles", [])
+            if isinstance(article_ref, str) and article_ref.strip()
+        )
+    refs.update(
+        _root_relative_article_ref(article_ref)
+        for article_ref in inventory.get("by_source", {}).get(source_rel_path, [])
+    )
+    return sorted(refs)
+
+
+def _planned_title_for_source(source: SourceRecord, manifest: dict) -> str:
+    source_entry = manifest.get("sources", {}).get(source.rel_path)
+    source_metadata = source_entry.get("metadata", {}) if isinstance(source_entry, dict) else {}
+    raw_title = source_metadata.get("title")
+    if raw_title:
+        return str(raw_title).strip()
+    label = source.path.stem.replace("_", " ").replace("-", " ").strip()
+    return " ".join(part.capitalize() for part in label.split()) or source.path.stem
+
+
+def _planned_category_for_source(source: SourceRecord, manifest: dict) -> str:
+    source_entry = manifest.get("sources", {}).get(source.rel_path)
+    source_metadata = source_entry.get("metadata", {}) if isinstance(source_entry, dict) else {}
+    raw_category = source_metadata.get("category")
+    if raw_category is not None:
+        return str(raw_category).strip()
+
+    parent = Path(source.rel_path).parent
+    if parent == Path("."):
+        return ""
+    parts = [slugify(part) for part in parent.parts if part not in {".", ""}]
+    return "/".join(part for part in parts if part)
+
+
+def _planned_article_for_source(source: SourceRecord, manifest: dict) -> dict[str, str]:
+    source_entry = manifest.get("sources", {}).get(source.rel_path)
+    source_metadata = source_entry.get("metadata", {}) if isinstance(source_entry, dict) else {}
+    title = _planned_title_for_source(source, manifest)
+    category = _planned_category_for_source(source, manifest)
+    raw_slug = source_metadata.get("slug")
+    slug = str(raw_slug).strip() if raw_slug else slugify(source.path.stem)
+    wiki_relative = f"{category}/{slug}.md" if category else f"{slug}.md"
+    return {
+        "article_path": f"wiki/{wiki_relative}",
+        "wikilink": wiki_relative.removesuffix(".md"),
+        "title": title,
+        "category": category,
+        "slug": slug,
+    }
+
+
 def build_compilation_plan(
     kb_root: str | Path,
     explicit_targets: list[str | Path] | None = None,
 ) -> CompilationPlan:
     root = Path(kb_root).resolve()
     manifest = load_manifest(root)
+    inventory = article_inventory(root)
     sources = discover_sources(root, explicit_targets=explicit_targets)
     manifest_in_use = manifest_path(root).exists()
     compiled_refs = set(manifest.get("sources", {})) if manifest_in_use else compiled_source_refs_from_wiki(root)
@@ -205,11 +349,85 @@ def build_compilation_plan(
             else:
                 new_sources.append(source)
 
+    impacted_index: dict[str, dict[str, object]] = {}
+    planned_index: dict[str, dict[str, object]] = {}
+
+    for bucket, reason in (
+        (stale_sources, "linked source changed since the last compile"),
+        (new_sources, "new source needs an initial article target"),
+    ):
+        for source in bucket:
+            linked_articles = _linked_article_refs(source.rel_path, manifest, inventory)
+            if linked_articles:
+                for article_ref in linked_articles:
+                    descriptor = _article_descriptor(article_ref, manifest, inventory)
+                    impacted = impacted_index.setdefault(
+                        descriptor["article_path"],
+                        {
+                            **descriptor,
+                            "source_rel_paths": set(),
+                            "reasons": set(),
+                        },
+                    )
+                    impacted["source_rel_paths"].add(source.rel_path)
+                    impacted["reasons"].add(reason)
+
+                    plan = planned_index.setdefault(
+                        descriptor["article_path"],
+                        {
+                            "action": "refresh",
+                            **descriptor,
+                            "source_rel_paths": set(),
+                            "reasons": set(),
+                        },
+                    )
+                    plan["source_rel_paths"].add(source.rel_path)
+                    plan["reasons"].add(reason)
+                continue
+
+            descriptor = _planned_article_for_source(source, manifest)
+            plan = planned_index.setdefault(
+                descriptor["article_path"],
+                {
+                    "action": "create",
+                    **descriptor,
+                    "source_rel_paths": set(),
+                    "reasons": set(),
+                },
+            )
+            plan["source_rel_paths"].add(source.rel_path)
+            plan["reasons"].add(reason)
+
     return CompilationPlan(
         all_sources=sources,
         new_sources=new_sources,
         stale_sources=stale_sources,
         unchanged_sources=unchanged_sources,
+        impacted_articles=[
+            ImpactedArticle(
+                article_path=article_path,
+                wikilink=str(payload["wikilink"]),
+                title=str(payload["title"]),
+                category=str(payload["category"]),
+                slug=str(payload["slug"]),
+                source_rel_paths=sorted(payload["source_rel_paths"]),
+                reasons=sorted(payload["reasons"]),
+            )
+            for article_path, payload in sorted(impacted_index.items())
+        ],
+        planned_articles=[
+            ArticlePlan(
+                action=str(payload["action"]),
+                article_path=article_path,
+                wikilink=str(payload["wikilink"]),
+                title=str(payload["title"]),
+                category=str(payload["category"]),
+                slug=str(payload["slug"]),
+                source_rel_paths=sorted(payload["source_rel_paths"]),
+                reasons=sorted(payload["reasons"]),
+            )
+            for article_path, payload in sorted(planned_index.items())
+        ],
         compiled_source_refs=compiled_refs,
         manifest_in_use=manifest_in_use,
     )
@@ -237,6 +455,18 @@ def record_compilation(
             source_path,
             article_paths=normalized_articles,
             metadata=metadata,
+        )
+
+    article_title = str(metadata.get("title")).strip() if isinstance(metadata, dict) and metadata.get("title") else None
+    for article in article_paths:
+        article_path = (root / article).resolve() if not Path(article).is_absolute() else Path(article).resolve()
+        update_article_entry(
+            manifest,
+            root,
+            article_path,
+            source_paths=source_paths,
+            metadata=metadata,
+            title=article_title,
         )
 
     return save_manifest(root, manifest)
@@ -283,7 +513,7 @@ def write_compiled_article(
             root,
             list(sources),
             [result.path],
-            metadata={"title": title, **(metadata or {})},
+            metadata={"title": title, "category": category, "slug": result.path.stem, **(metadata or {})},
         )
     prepend_recent_entry(root, f"{_recent_entry_date(created, updated)} [[{result.wikilink}]] — {result.status}")
     sync_kb_indexes(root)
@@ -320,6 +550,8 @@ def _plan_to_jsonable(plan: CompilationPlan) -> dict:
             }
             for item in payload[key]
         ]
+    for key in ("impacted_articles", "planned_articles"):
+        payload[key] = list(payload[key])
     payload["compiled_source_refs"] = sorted(payload["compiled_source_refs"])
     return payload
 
@@ -329,6 +561,10 @@ def _print_plan(plan: CompilationPlan) -> None:
         f"Sources: {len(plan.all_sources)} total | "
         f"{len(plan.new_sources)} new | {len(plan.stale_sources)} stale | "
         f"{len(plan.unchanged_sources)} unchanged"
+    )
+    print(
+        f"Articles: {len(plan.impacted_articles)} impacted | "
+        f"{len(plan.planned_articles)} planned"
     )
     print(f"Manifest: {'present' if plan.manifest_in_use else 'absent (falling back to article sources)'}")
 
@@ -342,12 +578,25 @@ def _print_plan(plan: CompilationPlan) -> None:
         for item in items:
             print(f"  - {item.rel_path} [{item.kind}]")
 
+    if plan.impacted_articles:
+        print("Impacted articles:")
+        for article in plan.impacted_articles:
+            print(f"  - {article.article_path} <- {', '.join(article.source_rel_paths)}")
+
+    if plan.planned_articles:
+        print("Planned article actions:")
+        for article in plan.planned_articles:
+            print(
+                f"  - {article.action}: {article.article_path} <- "
+                f"{', '.join(article.source_rel_paths)}"
+            )
+
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="llm-notes compile helpers")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    plan_parser = subparsers.add_parser("plan", help="compute the current compilation plan")
+    plan_parser = subparsers.add_parser("plan", help="compute the current source/article compilation plan")
     plan_parser.add_argument("targets", nargs="*", help="optional source files or directories to scope the plan")
     plan_parser.add_argument("--kb-root")
     plan_parser.add_argument("--json", action="store_true")

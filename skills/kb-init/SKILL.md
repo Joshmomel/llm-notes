@@ -76,9 +76,10 @@ Initialize a knowledge base in the specified directory (default: current directo
 6. **Create `outputs/_manifest.json`:**
    ```json
    {
-     "version": 1,
+     "version": 2,
      "updated_at": null,
-     "sources": {}
+     "sources": {},
+     "articles": {}
    }
    ```
 
@@ -139,7 +140,7 @@ Initialize a knowledge base in the specified directory (default: current directo
    2. Update `wiki/_index.md` (master index — categories list, stats)
    3. Update `wiki/_glossary.md` with any new terms
    4. Update `wiki/_recent.md` with the change
-   5. Update `outputs/_manifest.json` with source digests and destination article paths
+   5. Update `outputs/_manifest.json` with source digests, destination article paths, and article-side source refs
 
    ## Available Skills
 

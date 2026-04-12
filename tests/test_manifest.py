@@ -5,12 +5,14 @@ import unittest
 from pathlib import Path
 
 from llm_notes.manifest import (
+    tracked_articles,
     load_manifest,
     manifest_path,
     save_manifest,
     source_digest,
     source_is_stale,
     tracked_sources,
+    update_article_entry,
     update_source_entry,
 )
 
@@ -20,6 +22,7 @@ class ManifestTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest = load_manifest(tmpdir)
             self.assertEqual(manifest["sources"], {})
+            self.assertEqual(manifest["articles"], {})
             self.assertIsNone(manifest["updated_at"])
 
     def test_save_and_reload_manifest(self) -> None:
@@ -84,6 +87,30 @@ class ManifestTests(unittest.TestCase):
             )
             self.assertEqual(entry["metadata"]["title"], "Attention")
             self.assertTrue(entry["metadata"]["filed"])
+
+    def test_update_article_entry_tracks_source_refs_and_digests(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest = load_manifest(tmpdir)
+            source = Path(tmpdir) / "notes.md"
+            article = Path(tmpdir) / "wiki" / "ml" / "attention.md"
+            source.write_text("# Title\n\nBody", encoding="utf-8")
+
+            update_article_entry(
+                manifest,
+                tmpdir,
+                article,
+                source_paths=[source],
+                metadata={"planner": "compile"},
+                title="Attention",
+            )
+
+            self.assertIn("wiki/ml/attention.md", tracked_articles(manifest))
+            entry = manifest["articles"]["wiki/ml/attention.md"]
+            self.assertEqual(entry["title"], "Attention")
+            self.assertEqual(entry["wikilink"], "ml/attention")
+            self.assertEqual(entry["source_refs"], ["notes.md"])
+            self.assertIn("notes.md", entry["source_digests"])
+            self.assertEqual(entry["metadata"]["planner"], "compile")
 
 
 if __name__ == "__main__":

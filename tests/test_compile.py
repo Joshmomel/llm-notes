@@ -77,6 +77,11 @@ class CompileTests(unittest.TestCase):
             self.assertEqual([item.rel_path for item in plan.new_sources], ["fresh.md"])
             self.assertEqual([item.rel_path for item in plan.stale_sources], ["stale.md"])
             self.assertEqual([item.rel_path for item in plan.unchanged_sources], ["unchanged.md"])
+            self.assertEqual([item.article_path for item in plan.impacted_articles], ["wiki/ml/stale.md"])
+            self.assertEqual(
+                [(item.action, item.article_path) for item in plan.planned_articles],
+                [("create", "wiki/fresh.md"), ("refresh", "wiki/ml/stale.md")],
+            )
             self.assertTrue(plan.manifest_in_use)
 
     def test_build_compilation_plan_falls_back_to_article_sources(self) -> None:
@@ -136,6 +141,53 @@ class CompileTests(unittest.TestCase):
             self.assertIn("notes.md", manifest["sources"])
             self.assertEqual(manifest["sources"]["notes.md"]["articles"], ["wiki/ml/attention.md"])
             self.assertEqual(manifest["sources"]["notes.md"]["metadata"]["kind"], "test")
+            self.assertIn("wiki/ml/attention.md", manifest["articles"])
+            self.assertEqual(manifest["articles"]["wiki/ml/attention.md"]["source_refs"], ["notes.md"])
+
+    def test_build_compilation_plan_reports_existing_article_refresh_and_new_article_target(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            kb_root = Path(tmpdir)
+            (kb_root / "wiki" / "ml").mkdir(parents=True)
+            (kb_root / "outputs").mkdir()
+            notes_dir = kb_root / "notes"
+            notes_dir.mkdir()
+
+            tracked = notes_dir / "attention.md"
+            tracked.write_text("# Attention\n\nBody", encoding="utf-8")
+            article = kb_root / "wiki" / "ml" / "attention.md"
+            article.write_text(
+                serialize_article(
+                    {
+                        "title": "Attention",
+                        "created": "2026-04-11",
+                        "updated": "2026-04-11",
+                        "sources": ["notes/attention.md"],
+                        "tags": ["attention"],
+                    },
+                    "Body",
+                ),
+                encoding="utf-8",
+            )
+            record_compilation(
+                kb_root,
+                [tracked],
+                [article],
+                metadata={"title": "Attention", "category": "ml", "slug": "attention"},
+            )
+
+            tracked.write_text("# Attention\n\nUpdated body", encoding="utf-8")
+            novel = notes_dir / "novel-concept.md"
+            novel.write_text("# Novel\n\nBody", encoding="utf-8")
+
+            plan = build_compilation_plan(kb_root)
+
+            self.assertEqual([item.article_path for item in plan.impacted_articles], ["wiki/ml/attention.md"])
+            refresh = next(item for item in plan.planned_articles if item.action == "refresh")
+            create = next(item for item in plan.planned_articles if item.action == "create")
+            self.assertEqual(refresh.article_path, "wiki/ml/attention.md")
+            self.assertEqual(refresh.source_rel_paths, ["notes/attention.md"])
+            self.assertEqual(create.article_path, "wiki/notes/novel-concept.md")
+            self.assertEqual(create.source_rel_paths, ["notes/novel-concept.md"])
 
     def test_sync_kb_indexes_regenerates_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -176,6 +228,7 @@ class CompileTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertEqual(payload["new_sources"][0]["rel_path"], "notes.md")
             self.assertEqual(payload["all_sources"][0]["kind"], "document")
+            self.assertEqual(payload["planned_articles"][0]["action"], "create")
 
     def test_main_requires_existing_wiki_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -272,14 +272,24 @@ def list_articles(kb_root: str | Path) -> list[Article]:
 def article_inventory(kb_root: str | Path) -> dict[str, Any]:
     articles = list_articles(kb_root)
     by_source: dict[str, list[str]] = {}
+    by_article: dict[str, dict[str, Any]] = {}
 
     for article in articles:
+        by_article[article.rel_path] = {
+            "rel_path": article.rel_path,
+            "wikilink": article.wikilink,
+            "title": article.title,
+            "category": article.category,
+            "slug": article.slug,
+            "sources": sorted(article.metadata.get("sources", [])),
+        }
         for source in article.metadata.get("sources", []):
             by_source.setdefault(source, []).append(article.rel_path)
 
     return {
         "articles": articles,
         "by_source": {source: sorted(paths) for source, paths in sorted(by_source.items())},
+        "by_article": dict(sorted(by_article.items())),
     }
 
 
