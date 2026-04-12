@@ -119,15 +119,82 @@ filed_to_wiki: false
 
 The short answer shown to the user in chat should mirror the same four sections, even if abbreviated.
 
+Prefer the deterministic helper instead of hand-editing answer frontmatter yourself:
+
+```bash
+python3 -m llm_notes.answers save \
+  --kb-root <kb-root> \
+  --question "<full question>" \
+  --source-consulted wiki/category/article.md \
+  --source-consulted wiki/category/other-article.md \
+  --body-stdin <<'EOF'
+# <Question>
+
+## Main Conclusion
+
+...
+
+## Knowledge Network Extension
+
+...
+
+## Deep-Dive Threads
+
+...
+
+## Further Questions
+
+...
+
+## Sources Consulted
+
+...
+
+## Gaps Identified
+
+...
+EOF
+```
+
+Default behavior: always save the answer note first. `outputs/answers/` is the audit layer for KB Q&A.
+
 ### Step 5: Offer to File Back
 
-Ask the user: "File this back into the wiki?"
+After saving the answer, decide whether it should be promoted into the wiki:
 
-If yes:
-1. Extract key insights from the answer
-2. Create a new wiki article or enrich an existing one with the synthesized knowledge
-3. Add or update wikilinks so the newly surfaced neighboring concepts become part of the wiki graph
-4. Update all indexes (`_index.md`, `_glossary.md`, `_recent.md`)
-5. Update the answer file: set `filed_to_wiki: true` and add a link to the destination article
+- Auto-file by default when the answer is clearly reusable synthesis:
+  - it combines 2 or more sources
+  - it establishes a durable comparison, taxonomy, decision, or concept link
+  - it should obviously enrich an existing article or become a new article
+- Do not auto-file low-value or ephemeral answers:
+  - one-off operational answers
+  - short fact lookups
+  - answers that mostly repeat one existing article
+- If the destination article is ambiguous or filing would be risky, ask the user before filing.
+
+Prefer the deterministic filing helper:
+
+```bash
+python3 -m llm_notes.answers file \
+  --kb-root <kb-root> \
+  --answer outputs/answers/YYYY-MM-DD-slug.md \
+  --mode auto
+```
+
+If you already know it should enrich a specific article:
+
+```bash
+python3 -m llm_notes.answers file \
+  --kb-root <kb-root> \
+  --answer outputs/answers/YYYY-MM-DD-slug.md \
+  --mode enrich \
+  --article category/article
+```
+
+The helper will:
+1. Resolve consulted wiki articles back to canonical source files
+2. Create a new wiki article or append a dated filed insight to an existing one
+3. Update bookkeeping via the local helpers (`_index.md`, `_recent.md`, `outputs/_manifest.json`)
+4. Mark the answer note as filed and record the destination wikilink
 
 This way explorations and queries always "add up" in the knowledge base.

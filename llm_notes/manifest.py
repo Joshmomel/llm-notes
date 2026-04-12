@@ -115,14 +115,23 @@ def update_source_entry(
 ) -> dict[str, Any]:
     rel_path = _relative_to_root(source_path, kb_root)
     source = Path(source_path)
+    existing = manifest.setdefault("sources", {}).get(rel_path)
+    existing_articles = []
+    existing_metadata: dict[str, Any] = {}
+    if isinstance(existing, dict):
+        existing_articles = existing.get("articles", []) if isinstance(existing.get("articles"), list) else []
+        existing_metadata = existing.get("metadata", {}) if isinstance(existing.get("metadata"), dict) else {}
+
     entry: dict[str, Any] = {
         "digest": source_digest(source),
         "mtime_ns": source.stat().st_mtime_ns,
         "compiled_at": _now_iso(),
-        "articles": sorted(article_paths or []),
+        "articles": sorted(set(existing_articles + list(article_paths or []))),
     }
-    if metadata:
-        entry["metadata"] = metadata
+    combined_metadata = dict(existing_metadata)
+    combined_metadata.update(metadata or {})
+    if combined_metadata:
+        entry["metadata"] = combined_metadata
     manifest.setdefault("sources", {})[rel_path] = entry
     return entry
 

@@ -56,6 +56,35 @@ class ManifestTests(unittest.TestCase):
             source.write_text("# Title\n\nUpdated body", encoding="utf-8")
             self.assertTrue(source_is_stale(load_manifest(tmpdir), tmpdir, source))
 
+    def test_update_source_entry_merges_articles_and_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest = load_manifest(tmpdir)
+            source = Path(tmpdir) / "notes.md"
+            source.write_text("# Title\n\nBody", encoding="utf-8")
+
+            update_source_entry(
+                manifest,
+                tmpdir,
+                source,
+                article_paths=["wiki/ml/attention.md"],
+                metadata={"title": "Attention"},
+            )
+            update_source_entry(
+                manifest,
+                tmpdir,
+                source,
+                article_paths=["wiki/synthesis/attention-tradeoffs.md"],
+                metadata={"filed": True},
+            )
+
+            entry = manifest["sources"]["notes.md"]
+            self.assertEqual(
+                entry["articles"],
+                ["wiki/ml/attention.md", "wiki/synthesis/attention-tradeoffs.md"],
+            )
+            self.assertEqual(entry["metadata"]["title"], "Attention")
+            self.assertTrue(entry["metadata"]["filed"])
+
 
 if __name__ == "__main__":
     unittest.main()
