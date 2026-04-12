@@ -17,16 +17,17 @@ This directory is an `llm-notes` knowledge base.
 
 Rules:
 - For knowledge-oriented questions, prefer the single-step finisher: `python3 -m llm_notes.answers finalize --kb-root . ...`.
+- For multi-turn KB discussions, keep a transcript in `outputs/sessions/` with `python3 -m llm_notes.chat ...`.
 - `finalize` saves the answer note, auto-files reusable synthesis, and refreshes `outputs/lint-report.md`.
-- Treat `outputs/answers/` as the audit layer, not as canonical source material. When filing back into the wiki, prefer canonical source files and existing wiki articles.
+- Treat `outputs/answers/` and `outputs/sessions/` as audit layers, not as canonical source material. When filing back into the wiki, prefer canonical source files and existing wiki articles.
 - If a pending answer still needs semantic review, refresh the semantic shortlist with `python3 -m llm_notes.semantic_lint --kb-root .`.
 """
 
 _HOOK_CONTEXT = (
     "llm-notes: This is a knowledge-base repo. For knowledge-oriented work, save answers to "
-    "outputs/answers with `python3 -m llm_notes.answers finalize`. That command also auto-files "
-    "reusable synthesis and refreshes lint state. Prefer canonical sources over outputs when "
-    "updating the wiki."
+    "outputs/answers with `python3 -m llm_notes.answers finalize`, and keep multi-turn KB chats in "
+    "outputs/sessions with `python3 -m llm_notes.chat`. Finalize also auto-files reusable synthesis "
+    "and refreshes lint state. Prefer canonical sources over outputs when updating the wiki."
 )
 
 _SETTINGS_HOOK = {
@@ -36,7 +37,7 @@ _SETTINGS_HOOK = {
             "type": "command",
             "command": (
                 "[ -d wiki ] && "
-                + r"""echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"llm-notes: This is a knowledge-base repo. For knowledge-oriented work, save answers to outputs/answers with `python3 -m llm_notes.answers finalize`. That command also auto-files reusable synthesis and refreshes lint state. Prefer canonical sources over outputs when updating the wiki."}}' """
+                + r"""echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"llm-notes: This is a knowledge-base repo. For knowledge-oriented work, save answers to outputs/answers with `python3 -m llm_notes.answers finalize`, and keep multi-turn KB chats in outputs/sessions with `python3 -m llm_notes.chat`. Finalize also auto-files reusable synthesis and refreshes lint state. Prefer canonical sources over outputs when updating the wiki."}}' """
                 + "|| true"
             ),
         }

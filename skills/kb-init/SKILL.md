@@ -144,6 +144,7 @@ Initialize a knowledge base in the specified directory (default: current directo
    ## Available Skills
 
    - `/kb-compile` — Compile source material from the KB root into wiki articles
+   - `/kb-chat` — Keep a multi-turn KB conversation transcript and promote stable synthesis back into the KB
    - `/kb-qa` — Ask questions against the wiki, save answers, optionally file back
    - `/kb-lint` — Run health checks, view stats, get exploration suggestions
    ```
@@ -164,6 +165,7 @@ This keeps the KB workflow from depending only on skill text by also updating lo
    - Source mode: KB root (`<target>/`)
    - N files compiled into wiki articles (if files existed)
    - If no files existed, drop files into <target>/ and run /kb-compile
+   - Run /kb-chat for transcript-backed follow-up conversations
    - Run /kb-qa to ask questions
    - Run /kb-lint for health checks
    - Open this directory in Obsidian to view

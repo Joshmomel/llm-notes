@@ -19,6 +19,7 @@
 | ------------- | ------------------------------------------------------------------------------- |
 | `/kb-init`    | 初始化知识库目录，创建 `wiki/`、`outputs/`、`CLAUDE.md` 和基础索引；如果目录已有内容，会自动编译现有材料             |
 | `/kb-compile` | 读取知识库根目录中的源材料，生成或更新结构化 wiki 文章，并维护 `_index.md`、`_glossary.md`、`_recent.md`      |
+| `/kb-chat`    | 开启多轮 KB 对话，把完整对话轨迹保存到 `outputs/sessions/`，在同一会话里承接 follow-up，并把稳定结论沉淀回答案或 wiki |
 | `/kb-qa`      | 基于现有 wiki 回答问题，优先复用 `/kb-search` 的 TF-IDF 索引召回候选文章，并沿相关概念延伸知识网络；在覆盖不足时回读源文件，将答案保存到 `outputs/answers/`，并可选择回填到 wiki |
 | `/kb-lint`    | 执行健康检查，识别孤立文章、失效 wikilinks、过时内容和未覆盖源文件，将报告保存到 `outputs/lint-report.md`，并自动修复安全项 |
 | `/kb-slides`  | 基于 wiki 内容生成 Marp 幻灯片，保存到 `outputs/slides/`，可在 Obsidian 中配合 Marp 插件查看 |
@@ -64,6 +65,7 @@ cd llm-notes
 ```bash
 # 在 Claude Code 中
 /kb-init .
+/kb-chat "先梳理这个知识库的主线，并把 follow-up 放进同一会话"
 /kb-qa "这个知识库里有哪些主要主题？"
 /kb-lint
 ```
@@ -87,7 +89,7 @@ cd llm-notes
 ```bash
 # 在 Claude Code 中
 /kb-init .
-/kb-qa "总结这里的核心主题和结构"
+/kb-chat "总结这里的核心主题和结构，并保持会话继续"
 /kb-lint
 ```
 
@@ -101,6 +103,16 @@ cd llm-notes
 # 将笔记、代码、PDF、图片或其他源文件放入当前目录
 /kb-compile
 /kb-qa "当前知识库中已经形成了哪些主题？"
+```
+
+### 保持在同一个 KB 会话里
+
+如果你预期会连续追问同一个主题，更适合用 `/kb-chat`：
+
+```bash
+/kb-chat "比较这里的 dense attention 和 retrieval"
+# -> 对话轨迹会累积到 outputs/sessions/YYYY-MM-DD-*.md
+# -> 稳定结论仍然可以提炼到 outputs/answers/ 并回填 wiki/
 ```
 
 ## 生成后的知识库结构
@@ -120,6 +132,7 @@ your-kb/
     ├── _manifest.json
     ├── answers/
     ├── images/
+    ├── sessions/
     └── slides/
 ```
 
@@ -130,11 +143,13 @@ your-kb/
 ```text
 llm-notes/
 ├── llm_notes/
+│   ├── chat.py
 │   ├── compile.py
 │   ├── manifest.py
 │   ├── search.py
 │   └── wiki.py
 ├── skills/
+│   ├── kb-chat/
 │   ├── kb-init/
 │   ├── kb-compile/
 │   ├── kb-qa/

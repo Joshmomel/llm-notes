@@ -11,6 +11,7 @@ requires-python = ">=3.10"
 
 [project.scripts]
 llm-notes-answers = "llm_notes.answers:main"
+llm-notes-chat = "llm_notes.chat:main"
 llm-notes-claude = "llm_notes.claude:main"
 llm-notes-compile = "llm_notes.compile:main"
 llm-notes-codex = "llm_notes.codex:main"

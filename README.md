@@ -19,6 +19,7 @@ Unlike workflows that require a `raw/` + `wiki/` layout, the current implementat
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/kb-init`    | Initialize a knowledge base directory, create `wiki/`, `outputs/`, `CLAUDE.md`, and starter indexes, and auto-compile existing material when present                            |
 | `/kb-compile` | Read source material from the KB root, create or update structured wiki articles, and maintain `_index.md`, `_glossary.md`, and `_recent.md`                                    |
+| `/kb-chat`    | Run a multi-turn KB conversation, keep the transcript in `outputs/sessions/`, continue follow-up questions inside one session, and promote stable conclusions into answers/wiki |
 | `/kb-qa`      | Answer questions against the wiki, reuse `/kb-search`'s TF-IDF index to shortlist relevant articles, extend the local knowledge network through related concepts, fall back to source files when coverage is insufficient, save answers to `outputs/answers/`, and optionally file insights back into the wiki |
 | `/kb-lint`    | Run health checks, identify orphan articles, broken wikilinks, stale content, and uncovered sources, save a report to `outputs/lint-report.md`, and auto-fix safe issues        |
 | `/kb-slides`  | Generate Marp-format slide decks from wiki content, save to `outputs/slides/`, viewable in Obsidian with the Marp plugin                                                       |
@@ -64,6 +65,7 @@ After installation, open any directory you want to use as a knowledge base in Cl
 ```bash
 # inside Claude Code
 /kb-init .
+/kb-chat "Let's explore the main themes here and keep the follow-ups in one session"
 /kb-qa "What are the main themes in this knowledge base?"
 /kb-lint
 ```
@@ -87,7 +89,7 @@ Use this when you already have documents, code, or research material in a direct
 ```bash
 # inside Claude Code
 /kb-init .
-/kb-qa "Summarize the main themes and structure here"
+/kb-chat "Summarize the main themes and structure here, then stay open for follow-ups"
 /kb-lint
 ```
 
@@ -101,6 +103,16 @@ Use this when you want to build a new knowledge base from scratch:
 # add notes, code, PDFs, images, or other source files into this directory
 /kb-compile
 /kb-qa "What topics have emerged in the knowledge base so far?"
+```
+
+### Stay In A KB Chat Session
+
+Use this when you expect multiple follow-up questions on the same topic:
+
+```bash
+/kb-chat "Compare dense attention and retrieval here"
+# -> transcript accumulates in outputs/sessions/YYYY-MM-DD-*.md
+# -> stable conclusions can still be distilled into outputs/answers/ and filed back into wiki/
 ```
 
 ### Generate Slides From Wiki Content
@@ -133,6 +145,7 @@ A complete workflow combining all skills:
 
 ```bash
 /kb-init .                           # Initialize and auto-compile
+/kb-chat "Work through the open research questions"  # Keep a transcript-backed session
 /kb-qa "What are the key findings?"  # Ask questions, file answers back
 /kb-slides "Summary of findings"     # Generate a presentation
 /kb-viz "Timeline of key events"     # Create a visualization
@@ -157,6 +170,7 @@ your-kb/
     ├── _manifest.json
     ├── answers/
     ├── images/
+    ├── sessions/
     └── slides/
 ```
 
@@ -167,11 +181,13 @@ Important detail: in the current implementation, source files live directly in t
 ```text
 llm-notes/
 ├── llm_notes/
+│   ├── chat.py
 │   ├── compile.py
 │   ├── manifest.py
 │   ├── search.py
 │   └── wiki.py
 ├── skills/
+│   ├── kb-chat/
 │   ├── kb-init/
 │   ├── kb-compile/
 │   ├── kb-qa/
