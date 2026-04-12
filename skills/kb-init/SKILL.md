@@ -148,6 +148,14 @@ Initialize a knowledge base in the specified directory (default: current directo
    - `/kb-lint` — Run health checks, view stats, get exploration suggestions
    ```
 
+8.5 **Install the project-local Claude Code control plane** so answer saving / filing is reinforced by local instructions and a PreToolUse hook:
+
+```bash
+python3 -m llm_notes.claude install --kb-root <target>
+```
+
+This keeps the KB workflow from depending only on skill text by also updating local `CLAUDE.md` guidance and `.claude/settings.json`.
+
 9. **Auto-compile** — After initialization, automatically run the `/kb-compile` workflow to compile any existing source material in the directory into wiki articles. If the directory is empty, skip this step and explicitly tell the user the KB has no source files yet and they should drop files into the directory first.
 
 10. **Print summary:**
