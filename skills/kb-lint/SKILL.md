@@ -3,8 +3,8 @@ name: kb-lint
 version: 0.1.0
 description: |
   Run health checks on the knowledge base. Reports stats, finds broken links,
-  orphan articles, stale content, inconsistencies, and suggests new topics
-  to explore. Auto-fixes what it can.
+  orphan articles, stale content, uncovered sources, and answer notes that
+  should be filed back into the wiki. Auto-fixes safe bookkeeping issues.
 allowed-tools:
   - Read
   - Write
@@ -37,6 +37,9 @@ Count and report:
 - Total source files (eligible files in the KB root, plus any user-targeted code paths if applicable)
 - Unprocessed sources (not referenced in any wiki article's `sources:` frontmatter)
 - Recently updated articles (from `wiki/_recent.md`)
+- Total answer notes in `outputs/answers/`
+- Filed vs pending answers
+- High-value pending answers that should likely be promoted into `wiki/`
 
 ### Step 3: Run Checks
 
@@ -52,6 +55,16 @@ Perform these checks, collecting issues:
 8. **Inconsistent data** — conflicting facts or claims across different wiki articles
 9. **Missing data** — gaps in coverage that could be filled (suggest using web search to impute)
 10. **Suggested explorations** — interesting questions to ask, new article candidates based on patterns in existing content, unexplored connections between concepts
+11. **Pending answer filing queue** — answer notes that remain in `outputs/answers/` but now look reusable enough to file into the wiki
+12. **Filed answer target drift** — answers marked as filed whose destination wiki article no longer exists
+
+Preferred deterministic helper:
+
+```bash
+python3 -m llm_notes.lint --kb-root <kb-root> --json
+```
+
+Use the helper output and generated report as the primary health-check result instead of hand-assembling the report.
 
 ### Step 4: Auto-fix
 
@@ -59,8 +72,15 @@ Automatically fix what's safe to fix:
 - **Index drift** — update `_index.md` files to match actual directory contents
 - **Missing frontmatter** — add missing fields with sensible defaults
 - **Orphan articles** — add them to the appropriate `_index.md`
+- **Bookkeeping sync** — regenerate wiki indexes when you are asked to auto-fix or the report should refresh bookkeeping
 
 For each auto-fix, note what was changed.
+
+Preferred deterministic helper with safe fixes:
+
+```bash
+python3 -m llm_notes.lint --kb-root <kb-root> --fix --json
+```
 
 ### Step 5: Generate Report
 
@@ -79,6 +99,10 @@ date: YYYY-MM-DD
 - Total sources: N
 - Unprocessed sources: N
 - Last updated: YYYY-MM-DD
+- Total answers: N
+- Filed answers: N
+- Pending answers: N
+- High-value pending answers: N
 
 ## Health Score: X/10
 
@@ -92,6 +116,11 @@ date: YYYY-MM-DD
 
 ### Info
 - (uncovered sources, connection suggestions)
+
+## Answer Filing Queue
+
+- `outputs/answers/YYYY-MM-DD-slug.md` — score 0.80 — why it should be filed
+- candidate target article if known
 
 ## Auto-fixed
 
@@ -110,5 +139,6 @@ date: YYYY-MM-DD
 Print a brief summary to the user:
 - Health score
 - Number of issues by severity
+- Number of high-value pending answers waiting to be filed
 - Top 3 suggested explorations
 - Note any auto-fixes that were applied

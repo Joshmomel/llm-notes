@@ -12,6 +12,7 @@ requires-python = ">=3.10"
 [project.scripts]
 llm-notes-answers = "llm_notes.answers:main"
 llm-notes-compile = "llm_notes.compile:main"
+llm-notes-lint = "llm_notes.lint:main"
 llm-notes-search = "llm_notes.search:main"
 
 [tool.setuptools.packages.find]

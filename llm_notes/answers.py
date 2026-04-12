@@ -89,6 +89,17 @@ class AnswerNote:
     def promotion_targets(self) -> list[str]:
         return _normalize_list(self.metadata.get("promotion_targets"))
 
+    @property
+    def promotion_score(self) -> float | None:
+        return _normalize_float(self.metadata.get("promotion_score"))
+
+
+@dataclass(frozen=True)
+class FilingAssessment:
+    score: float
+    should_file: bool
+    reasons: list[str]
+
 
 def answers_root(kb_root: str | Path) -> Path:
     return Path(kb_root) / "outputs" / "answers"
@@ -268,6 +279,62 @@ def parse_answer(path: str | Path, kb_root: str | Path | None = None) -> AnswerN
         metadata=normalized,
         body=body,
         sections=_split_sections(body),
+    )
+
+
+def list_answers(kb_root: str | Path) -> list[AnswerNote]:
+    root = answers_root(kb_root)
+    if not root.exists():
+        return []
+
+    notes = []
+    for path in sorted(root.rglob("*.md")):
+        if path.is_file():
+            notes.append(parse_answer(path, kb_root))
+    return notes
+
+
+def assess_answer_for_filing(answer: AnswerNote) -> FilingAssessment:
+    if answer.filed_to_wiki:
+        return FilingAssessment(score=1.0, should_file=False, reasons=["already filed"])
+
+    score = 0.0
+    reasons: list[str] = []
+
+    if answer.promotion_score is not None:
+        score = max(score, answer.promotion_score)
+        reasons.append(f"metadata promotion_score={answer.promotion_score:.2f}")
+
+    if len(answer.sources_consulted) >= 2:
+        score += 0.35
+        reasons.append("multi-source synthesis")
+
+    main = _canonical_section(answer.sections, "main_conclusion")
+    if len(main) >= 160:
+        score += 0.20
+        reasons.append("substantive main conclusion")
+
+    related_count = len(_bulletize(_canonical_section(answer.sections, "knowledge_network_extension")))
+    if related_count >= 1:
+        score += 0.15
+        reasons.append("captures related concepts")
+
+    open_count = len(_bulletize(_canonical_section(answer.sections, "deep_dive_threads")))
+    open_count += len(_bulletize(_canonical_section(answer.sections, "further_questions")))
+    open_count += len(_bulletize(_canonical_section(answer.sections, "gaps_identified")))
+    if open_count >= 2:
+        score += 0.15
+        reasons.append("captures follow-up investigation")
+
+    if answer.promotion_targets:
+        score += 0.15
+        reasons.append("has destination candidate")
+
+    final_score = min(round(score, 2), 1.0)
+    return FilingAssessment(
+        score=final_score,
+        should_file=final_score >= 0.55,
+        reasons=reasons or ["no strong filing signals"],
     )
 
 
