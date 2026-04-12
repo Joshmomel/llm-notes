@@ -66,6 +66,35 @@ python3 -m llm_notes.lint --kb-root <kb-root> --json
 
 Use the helper output and generated report as the primary health-check result instead of hand-assembling the report.
 
+### Step 3.5: Build Semantic Candidate Set
+
+Before doing any semantic inconsistency or gap analysis, generate the deterministic candidate shortlist:
+
+```bash
+python3 -m llm_notes.semantic_lint --kb-root <kb-root> --json
+```
+
+This writes:
+
+- `outputs/lint-semantic-candidates.json` — machine-readable candidate set
+- `outputs/lint-semantic-candidates.md` — human-readable shortlist and review instructions
+
+Use these files to focus the semantic review instead of scanning the whole wiki blindly.
+
+The candidate set is specifically meant to drive:
+
+- **Inconsistent facts** — article pairs with overlapping tags/sources/category likely to contain conflicting claims
+- **Connection discovery** — article pairs that share tags/sources but still are not linked
+- **Missing data** — articles whose `Open Questions` sections indicate unresolved gaps
+- **Web-backed imputation** — open questions that likely require external verification or missing factual lookup
+- **Pending answer synthesis** — unanswered filing opportunities still stuck in `outputs/answers/`
+
+After reviewing the candidate set, write the semantic findings to:
+
+- `outputs/lint-semantic.md`
+
+This semantic report should be separate from the deterministic `outputs/lint-report.md`.
+
 ### Step 4: Auto-fix
 
 Automatically fix what's safe to fix:
@@ -140,5 +169,6 @@ Print a brief summary to the user:
 - Health score
 - Number of issues by severity
 - Number of high-value pending answers waiting to be filed
+- Number of semantic hotspot candidates generated
 - Top 3 suggested explorations
 - Note any auto-fixes that were applied
