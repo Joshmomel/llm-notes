@@ -193,6 +193,49 @@ class CompileTests(unittest.TestCase):
             self.assertEqual(create.article_path, "wiki/notes/novel-concept.md")
             self.assertEqual(create.source_rel_paths, ["notes/novel-concept.md"])
 
+    def test_build_compilation_plan_uses_source_article_targets_as_stable_hints(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            kb_root = Path(tmpdir)
+            (kb_root / "wiki" / "ml").mkdir(parents=True)
+            (kb_root / "outputs").mkdir()
+            source = kb_root / "notes.md"
+            source.write_text("# Note\n\nBody", encoding="utf-8")
+            article = kb_root / "wiki" / "ml" / "attention.md"
+            article.write_text(
+                serialize_article(
+                    {
+                        "title": "Attention",
+                        "created": "2026-04-11",
+                        "updated": "2026-04-11",
+                        "sources": ["notes.md"],
+                        "tags": ["attention"],
+                    },
+                    "Body",
+                ),
+                encoding="utf-8",
+            )
+
+            manifest = load_manifest(kb_root)
+            update_source_entry(
+                manifest,
+                kb_root,
+                source,
+                article_paths=["wiki/ml/attention.md"],
+                metadata={"title": "Attention", "category": "ml", "slug": "attention"},
+            )
+            manifest["sources"]["notes.md"]["articles"] = []
+            save_manifest(kb_root, manifest)
+
+            source.write_text("# Note\n\nUpdated body", encoding="utf-8")
+            plan = build_compilation_plan(kb_root)
+
+            self.assertEqual([item.rel_path for item in plan.stale_sources], ["notes.md"])
+            self.assertEqual([item.article_path for item in plan.impacted_articles], ["wiki/ml/attention.md"])
+            self.assertEqual(
+                [(item.action, item.article_path) for item in plan.planned_articles],
+                [("refresh", "wiki/ml/attention.md")],
+            )
+
     def test_sync_kb_indexes_regenerates_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             kb_root = Path(tmpdir)

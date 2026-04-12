@@ -86,8 +86,39 @@ class ManifestTests(unittest.TestCase):
                 entry["articles"],
                 ["wiki/ml/attention.md", "wiki/synthesis/attention-tradeoffs.md"],
             )
+            self.assertEqual(
+                [target["article_path"] for target in entry["article_targets"]],
+                ["wiki/ml/attention.md", "wiki/synthesis/attention-tradeoffs.md"],
+            )
             self.assertEqual(entry["metadata"]["title"], "Attention")
             self.assertTrue(entry["metadata"]["filed"])
+
+    def test_update_source_entry_persists_article_targets_with_planner_hints(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest = load_manifest(tmpdir)
+            source = Path(tmpdir) / "notes.md"
+            source.write_text("# Title\n\nBody", encoding="utf-8")
+
+            update_source_entry(
+                manifest,
+                tmpdir,
+                source,
+                article_paths=["wiki/ml/attention.md"],
+                metadata={
+                    "title": "Attention",
+                    "category": "ml",
+                    "slug": "attention",
+                    "planning_basis": "linked_article",
+                },
+            )
+
+            entry = manifest["sources"]["notes.md"]
+            self.assertEqual(entry["article_targets"][0]["article_path"], "wiki/ml/attention.md")
+            self.assertEqual(entry["article_targets"][0]["wikilink"], "ml/attention")
+            self.assertEqual(entry["article_targets"][0]["title"], "Attention")
+            self.assertEqual(entry["article_targets"][0]["category"], "ml")
+            self.assertEqual(entry["article_targets"][0]["slug"], "attention")
+            self.assertEqual(entry["article_targets"][0]["basis"], "linked_article")
 
     def test_update_article_entry_tracks_source_refs_and_digests(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

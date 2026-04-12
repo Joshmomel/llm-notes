@@ -139,7 +139,7 @@ your-kb/
 重要说明：当前实现中，源文件直接保存在知识库根目录；`llm-notes` **不要求单独的 `raw/` 目录**。
 
 `outputs/_manifest.json` 现在会同时跟踪编译状态的两侧：
-- `sources` 记录源文件 digest、mtime 和目标 wiki 文章
+- `sources` 记录源文件 digest、mtime、目标 wiki 文章，以及供后续 planning 使用的稳定 `article_targets`
 - `articles` 记录文章的 title/category/slug，以及上次编译时使用的 source refs 和 source digests
 
 这使 `/kb-compile` 不只能判断“哪些源文件变了”，还可以进一步判断“哪些既有文章受影响”以及“默认应该新建或刷新哪篇文章”。

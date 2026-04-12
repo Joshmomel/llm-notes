@@ -177,7 +177,7 @@ your-kb/
 Important detail: in the current implementation, source files live directly in the KB root. `llm-notes` does **not** require a separate `raw/` directory.
 
 `outputs/_manifest.json` now tracks both sides of compilation state:
-- `sources` records source digests, mtimes, and destination wiki articles
+- `sources` records source digests, mtimes, destination wiki articles, and stable `article_targets` hints for future planning
 - `articles` records article title/category/slug plus the source refs and source digests used for the last compile
 
 That lets `/kb-compile` reason about not just which source files changed, but which existing articles are impacted and which new article targets are the default next step.

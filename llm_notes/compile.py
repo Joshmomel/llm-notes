@@ -278,6 +278,11 @@ def _linked_article_refs(source_rel_path: str, manifest: dict, inventory: dict) 
             for article_ref in source_entry.get("articles", [])
             if isinstance(article_ref, str) and article_ref.strip()
         )
+        refs.update(
+            _root_relative_article_ref(target.get("article_path"))
+            for target in source_entry.get("article_targets", [])
+            if isinstance(target, dict) and isinstance(target.get("article_path"), str) and target.get("article_path").strip()
+        )
     refs.update(
         _root_relative_article_ref(article_ref)
         for article_ref in inventory.get("by_source", {}).get(source_rel_path, [])

@@ -121,6 +121,33 @@ def get_source_entry(
     return entry if isinstance(entry, dict) else None
 
 
+def _article_target_from_ref(
+    article_ref: str | Path,
+    *,
+    title: str | None = None,
+    category: str | None = None,
+    slug: str | None = None,
+    basis: str | None = None,
+) -> dict[str, Any]:
+    normalized_ref = _normalize_article_ref(article_ref)
+    wiki_relative = normalized_ref.removeprefix("wiki/")
+    derived_slug = Path(wiki_relative).stem
+    derived_category = "/".join(Path(wiki_relative).parts[:-1])
+    effective_category = category if category is not None else derived_category
+    effective_slug = slug or derived_slug
+    effective_title = title or effective_slug.replace("-", " ").title()
+    target = {
+        "article_path": normalized_ref,
+        "wikilink": wiki_relative.removesuffix(".md"),
+        "title": effective_title,
+        "category": effective_category,
+        "slug": effective_slug,
+    }
+    if basis:
+        target["basis"] = basis
+    return target
+
+
 def get_article_entry(
     manifest: dict[str, Any],
     kb_root: str | Path,
@@ -143,17 +170,52 @@ def update_source_entry(
     source = Path(source_path)
     existing = manifest.setdefault("sources", {}).get(rel_path)
     existing_articles = []
+    existing_targets: list[dict[str, Any]] = []
     existing_metadata: dict[str, Any] = {}
     if isinstance(existing, dict):
         existing_articles = existing.get("articles", []) if isinstance(existing.get("articles"), list) else []
+        existing_targets = existing.get("article_targets", []) if isinstance(existing.get("article_targets"), list) else []
         existing_metadata = existing.get("metadata", {}) if isinstance(existing.get("metadata"), dict) else {}
+
+    normalized_articles = sorted(set(existing_articles + list(article_paths or [])))
+    merged_targets: dict[str, dict[str, Any]] = {}
+    for target in existing_targets:
+        if isinstance(target, dict) and isinstance(target.get("article_path"), str):
+            merged_targets[target["article_path"]] = dict(target)
+
+    if article_paths:
+        resolved_title = None
+        resolved_category = None
+        resolved_slug = None
+        resolved_basis = None
+        if isinstance(metadata, dict) and len(article_paths) == 1:
+            raw_title = metadata.get("title")
+            raw_category = metadata.get("category")
+            raw_slug = metadata.get("slug")
+            raw_basis = metadata.get("planning_basis")
+            resolved_title = str(raw_title).strip() if raw_title else None
+            resolved_category = str(raw_category).strip() if raw_category is not None else None
+            resolved_slug = str(raw_slug).strip() if raw_slug else None
+            resolved_basis = str(raw_basis).strip() if raw_basis else None
+
+        for article_ref in article_paths:
+            target = _article_target_from_ref(
+                article_ref,
+                title=resolved_title,
+                category=resolved_category,
+                slug=resolved_slug,
+                basis=resolved_basis or "recorded_compilation",
+            )
+            merged_targets[target["article_path"]] = target
 
     entry: dict[str, Any] = {
         "digest": source_digest(source),
         "mtime_ns": source.stat().st_mtime_ns,
         "compiled_at": _now_iso(),
-        "articles": sorted(set(existing_articles + list(article_paths or []))),
+        "articles": normalized_articles,
     }
+    if merged_targets:
+        entry["article_targets"] = [merged_targets[key] for key in sorted(merged_targets)]
     combined_metadata = dict(existing_metadata)
     combined_metadata.update(metadata or {})
     if combined_metadata:
