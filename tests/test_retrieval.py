@@ -6,6 +6,7 @@ from pathlib import Path
 
 from llm_notes.retrieval import (
     build_source_index,
+    consulted_sources_from_retrieval,
     query_retrieval,
     search_source_index,
     suggest_retrieval_mode,
@@ -84,6 +85,11 @@ class RetrievalTests(unittest.TestCase):
             self.assertEqual(payload["executed_modes"], ["wiki", "source"])
             self.assertTrue(payload["wiki_results"])
             self.assertTrue(payload["source_results"])
+            self.assertEqual(payload["sources_consulted_by_mode"]["hybrid"][0], "wiki/ml/attention.md")
+            self.assertEqual(
+                set(payload["sources_consulted_by_mode"]["hybrid"]),
+                {"wiki/ml/attention.md", "notes/attention.md", "src/model.py"},
+            )
             self.assertTrue(any(item.startswith("wiki:") for item in payload["retrieval_trace"]))
             self.assertTrue(any(item.startswith("source:") for item in payload["retrieval_trace"]))
 
@@ -118,6 +124,28 @@ class RetrievalTests(unittest.TestCase):
             self.assertEqual(payload["executed_modes"], ["source"])
             self.assertFalse(payload["wiki_results"])
             self.assertTrue(payload["source_results"])
+
+    def test_consulted_sources_from_retrieval_normalizes_paths_by_mode(self) -> None:
+        payload = {
+            "wiki_results": [{"path": "ml/attention.md"}],
+            "source_results": [
+                {"source_path": "notes/attention.md"},
+                {"source_path": "src/model.py"},
+            ],
+        }
+
+        self.assertEqual(
+            consulted_sources_from_retrieval(payload, actual_mode="wiki_only"),
+            ["wiki/ml/attention.md"],
+        )
+        self.assertEqual(
+            consulted_sources_from_retrieval(payload, actual_mode="source_only"),
+            ["notes/attention.md", "src/model.py"],
+        )
+        self.assertEqual(
+            consulted_sources_from_retrieval(payload, actual_mode="hybrid"),
+            ["wiki/ml/attention.md", "notes/attention.md", "src/model.py"],
+        )
 
 
 if __name__ == "__main__":

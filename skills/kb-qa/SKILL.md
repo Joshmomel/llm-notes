@@ -58,6 +58,7 @@ Follow the navigation protocol to find relevant content:
      - `suggested_mode: source_only` — the question asks for exact source-level evidence
      - `suggested_mode: hybrid` — combine compiled wiki context with raw source retrieval
    - In `auto` mode inspect both `wiki_results` and `source_results`, then decide yourself which layer to trust more for the current question
+   - The payload also includes `sources_consulted_by_mode`, so once you choose the actual mode you can reuse that exact list instead of hand-assembling `sources_consulted`
    - Use the returned shortlist as navigation support, not as a substitute for reading the cited sources
 4. **Read relevant articles** — read 3-10 articles that relate to the question, prioritizing high-ranked retrieval hits when available
 5. **Read relevant source files when warranted** — if retrieval returns `source_results`, or if wiki coverage is clearly insufficient, read the referenced KB-root source files directly while excluding `wiki/`, `outputs/`, hidden dirs, `CLAUDE.md`, and `.gitignore`
@@ -172,7 +173,7 @@ python3 -m llm_notes.answers finalize \
 EOF
 ```
 
-If you used the retrieval helper, carry the **actual mode you ended up relying on** into `--retrieval-mode`, not just the helper's suggestion. This gives the KB an audit trail for whether the answer depended mainly on compiled wiki context, raw source reads, or both.
+If you used the retrieval helper, carry the **actual mode you ended up relying on** into `--retrieval-mode`, not just the helper's suggestion. Then pass `sources_consulted_by_mode[<actual_mode>]` as the canonical `--source-consulted` list. This gives the KB an audit trail for whether the answer depended mainly on compiled wiki context, raw source reads, or both.
 
 Default behavior: `finalize` saves the answer note into `outputs/answers/`, auto-files reusable synthesis when appropriate, and refreshes `outputs/lint-report.md`.
 

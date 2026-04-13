@@ -323,6 +323,50 @@ def search_source_index(kb_root: str | Path, query: str, limit: int = 10) -> lis
     return list(per_source.values())
 
 
+def consulted_sources_from_retrieval(payload: dict[str, Any], *, actual_mode: str) -> list[str]:
+    """Return normalized sources_consulted paths for the chosen retrieval mode."""
+
+    mode = {
+        "wiki": "wiki_only",
+        "source": "source_only",
+        "hybrid": "hybrid",
+        "wiki_only": "wiki_only",
+        "source_only": "source_only",
+    }.get(actual_mode, actual_mode)
+
+    consulted: list[str] = []
+    seen: set[str] = set()
+
+    if mode in {"wiki_only", "hybrid"}:
+        for result in payload.get("wiki_results", []):
+            path = result.get("path")
+            if not isinstance(path, str) or not path:
+                continue
+            normalized = f"wiki/{path}" if not path.startswith("wiki/") else path
+            if normalized not in seen:
+                consulted.append(normalized)
+                seen.add(normalized)
+
+    if mode in {"source_only", "hybrid"}:
+        for result in payload.get("source_results", []):
+            path = result.get("source_path")
+            if not isinstance(path, str) or not path:
+                continue
+            if path not in seen:
+                consulted.append(path)
+                seen.add(path)
+
+    return consulted
+
+
+def consulted_sources_by_mode(payload: dict[str, Any]) -> dict[str, list[str]]:
+    return {
+        "wiki_only": consulted_sources_from_retrieval(payload, actual_mode="wiki_only"),
+        "source_only": consulted_sources_from_retrieval(payload, actual_mode="source_only"),
+        "hybrid": consulted_sources_from_retrieval(payload, actual_mode="hybrid"),
+    }
+
+
 def suggest_retrieval_mode(question: str, *, mode: str = "auto") -> RetrievalSuggestion:
     explicit_mode = {
         "wiki": "wiki_only",
@@ -395,6 +439,12 @@ def query_retrieval(
         "wiki_results": [result.__dict__ for result in wiki_results],
         "source_results": [asdict(result) for result in source_results],
         "retrieval_trace": retrieval_trace,
+        "sources_consulted_by_mode": consulted_sources_by_mode(
+            {
+                "wiki_results": [result.__dict__ for result in wiki_results],
+                "source_results": [asdict(result) for result in source_results],
+            }
+        ),
     }
 
 
