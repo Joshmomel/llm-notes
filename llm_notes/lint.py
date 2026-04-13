@@ -16,6 +16,7 @@ from llm_notes.answers import (
     resolve_answer_sources,
 )
 from llm_notes.compile import discover_sources, find_kb_root, sync_kb_indexes
+from llm_notes.semantic_lint import build_semantic_candidates
 from llm_notes.wiki import article_inventory, list_articles, load_recent_entries
 
 LINT_REPORT_RELATIVE_PATH = Path("outputs") / "lint-report.md"
@@ -38,6 +39,7 @@ class LintStats:
     filed_answers: int
     pending_answers: int
     high_value_pending_answers: int
+    semantic_hotspots: int
 
 
 def lint_report_path(kb_root: str | Path) -> Path:
@@ -98,6 +100,7 @@ def _health_score(
     high_value_pending_answers: int,
     missing_filed_targets: int,
     unresolved_provenance: int,
+    semantic_hotspots: int,
 ) -> int:
     score = 10.0
     if unprocessed_sources:
@@ -108,6 +111,8 @@ def _health_score(
         score -= min(2.0, 1.0 * missing_filed_targets)
     if unresolved_provenance:
         score -= min(1.0, 0.5 * unresolved_provenance)
+    if semantic_hotspots:
+        score -= min(1.5, 0.25 * semantic_hotspots)
     return max(0, int(round(score)))
 
 
@@ -187,6 +192,13 @@ def run_lint(kb_root: str | Path, *, fix: bool = False) -> dict[str, Any]:
         if written:
             auto_fixed.append(f"Regenerated {len(written)} wiki index file(s)")
 
+    semantic_payload = build_semantic_candidates(root)
+    semantic_queue = [
+        issue
+        for issue in semantic_payload["issues"]
+        if issue["severity"] in {"warning", "critical"}
+    ][:10]
+
     stats = LintStats(
         total_articles=len(articles),
         total_sources=len(sources),
@@ -196,12 +208,14 @@ def run_lint(kb_root: str | Path, *, fix: bool = False) -> dict[str, Any]:
         filed_answers=sum(1 for answer in answers if answer.filed_to_wiki),
         pending_answers=sum(1 for answer in answers if not answer.filed_to_wiki),
         high_value_pending_answers=len(pending_queue),
+        semantic_hotspots=len(semantic_queue),
     )
     health_score = _health_score(
         unprocessed_sources=stats.unprocessed_sources,
         high_value_pending_answers=stats.high_value_pending_answers,
         missing_filed_targets=missing_filed_targets,
         unresolved_provenance=unresolved_provenance,
+        semantic_hotspots=stats.semantic_hotspots,
     )
 
     payload = {
@@ -211,6 +225,8 @@ def run_lint(kb_root: str | Path, *, fix: bool = False) -> dict[str, Any]:
         "issue_counts": _issue_counts(issues),
         "auto_fixed": auto_fixed,
         "pending_queue": pending_queue,
+        "semantic_queue": semantic_queue,
+        "semantic_candidate_counts": {key: len(value) for key, value in semantic_payload["candidates"].items()},
         "suggested_explorations": _suggested_explorations(root, pending_queue),
     }
     return payload
@@ -220,6 +236,7 @@ def render_report(kb_root: str | Path, result: dict[str, Any]) -> str:
     stats: LintStats = result["stats"]
     issues: list[LintIssue] = result["issues"]
     pending_queue: list[dict[str, Any]] = result["pending_queue"]
+    semantic_queue: list[dict[str, Any]] = result["semantic_queue"]
 
     lines = [
         "---",
@@ -238,6 +255,7 @@ def render_report(kb_root: str | Path, result: dict[str, Any]) -> str:
         f"- Filed answers: {stats.filed_answers}",
         f"- Pending answers: {stats.pending_answers}",
         f"- High-value pending answers: {stats.high_value_pending_answers}",
+        f"- Semantic hotspots: {stats.semantic_hotspots}",
         "",
         f"## Health Score: {result['health_score']}/10",
         "",
@@ -264,6 +282,18 @@ def render_report(kb_root: str | Path, result: dict[str, Any]) -> str:
             lines.append(f"  Command: `{recommendation['command']}`")
     else:
         lines.append("- No high-value pending answers.")
+    lines.append("")
+
+    lines.extend(["## Semantic Hotspots", ""])
+    if semantic_queue:
+        for issue in semantic_queue:
+            targets = ", ".join(f"`{target}`" for target in issue["target_wikilinks"]) or "-"
+            lines.append(
+                f"- `{issue['kind']}` — score {issue['score']:.2f} — action `{issue['suggested_action']}` — {targets}"
+            )
+            lines.append(f"  Reason: {issue['reason']}")
+    else:
+        lines.append("- No high-priority semantic hotspots.")
     lines.append("")
 
     lines.extend(["## Auto-fixed", ""])
@@ -301,11 +331,14 @@ def write_report(kb_root: str | Path, *, fix: bool = False) -> dict[str, Any]:
             "filed_answers": result["stats"].filed_answers,
             "pending_answers": result["stats"].pending_answers,
             "high_value_pending_answers": result["stats"].high_value_pending_answers,
+            "semantic_hotspots": result["stats"].semantic_hotspots,
         },
         "pending_queue": [
             item["recommendation"]
             for item in result["pending_queue"]
         ],
+        "semantic_queue": result["semantic_queue"],
+        "semantic_candidate_counts": result["semantic_candidate_counts"],
         "suggested_explorations": result["suggested_explorations"],
         "auto_fixed": result["auto_fixed"],
     }

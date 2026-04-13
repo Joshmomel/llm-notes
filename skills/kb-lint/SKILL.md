@@ -81,6 +81,7 @@ This writes:
 - `outputs/lint-semantic-candidates.md` — human-readable shortlist and review instructions
 
 Use these files to focus the semantic review instead of scanning the whole wiki blindly.
+The main lint flow should now also surface the highest-priority semantic issues directly in `outputs/lint-report.md` under `## Semantic Hotspots`.
 
 The candidate set is specifically meant to drive:
 
@@ -94,7 +95,7 @@ After reviewing the candidate set, write the semantic findings to:
 
 - `outputs/lint-semantic.md`
 
-This semantic report should be separate from the deterministic `outputs/lint-report.md`.
+This semantic report should still exist as its own artifact, but the top warning/critical semantic issues should also appear in the deterministic `outputs/lint-report.md`.
 
 ### Step 4: Auto-fix
 
@@ -153,6 +154,18 @@ date: YYYY-MM-DD
 - candidate target article if known
 - exact command to execute the recommendation, for example:
   `python3 -m llm_notes.answers file --kb-root . --answer outputs/answers/YYYY-MM-DD-slug.md --mode enrich --article ml/attention`
+
+## Semantic Hotspots
+
+- `duplicate_concept_candidate` / `merge_candidate` — overlapping wiki pages that likely describe the same concept
+- `split_candidate` — one article is trying to hold multiple article-sized topics
+- `inconsistency_hotspot` — related articles whose claims or framing should be reviewed together
+- `connection_candidate` — related pages that probably need explicit wikilinks or a synthesis article
+- Each hotspot should include:
+  - score
+  - suggested action
+  - target wikilinks
+  - short reason
 
 ## Auto-fixed
 

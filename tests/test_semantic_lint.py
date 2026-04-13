@@ -69,6 +69,41 @@ class SemanticLintTests(unittest.TestCase):
                     "- Benchmark coverage is still missing for multi-hour context.\n"
                 ),
             )
+            self._write_article(
+                wiki_dir / "attention-overview.md",
+                title="Attention",
+                sources=["notes/attention.md", "notes/benchmark.md"],
+                tags=["attention", "long-context", "overview"],
+                body=(
+                    "## Summary\n\nDense attention summary with overlapping framing.\n\n"
+                    "## Related\n\n- [[ml/retrieval]]\n\n"
+                    "## Open Questions\n\n"
+                    "- Which benchmark best captures long-context degradation?\n"
+                    "- When should this split into separate pages?\n"
+                ),
+            )
+            self._write_article(
+                wiki_dir / "systems-and-benchmarks.md",
+                title="Systems and Benchmarks",
+                sources=["notes/attention.md", "notes/benchmark.md", "notes/retrieval.md"],
+                tags=["attention", "retrieval", "benchmark", "systems"],
+                body=(
+                    "## Summary\n\nA very broad synthesis page.\n\n"
+                    "## Related\n\n"
+                    "- [[ml/attention]]\n"
+                    "- [[ml/retrieval]]\n"
+                    "- [[ml/attention-overview]]\n"
+                    "- [[ml/kv-cache]]\n"
+                    "- [[ml/latency]]\n"
+                    "- [[ml/context-window]]\n\n"
+                    "## Open Questions\n\n"
+                    "- Which benchmark best captures long-context degradation?\n"
+                    "- Which workloads benefit from retrieval?\n"
+                    "- Which memory bottleneck matters most?\n"
+                    "- Which pieces deserve their own page?\n\n"
+                    + ("Long section. " * 200)
+                ),
+            )
 
             save_answer(
                 kb_root,
@@ -85,11 +120,19 @@ class SemanticLintTests(unittest.TestCase):
 
             payload = build_semantic_candidates(kb_root)
 
+            self.assertTrue(payload["candidates"]["duplicate_candidates"])
+            self.assertTrue(payload["candidates"]["split_candidates"])
             self.assertTrue(payload["candidates"]["inconsistency_hotspots"])
             self.assertTrue(payload["candidates"]["connection_candidates"])
             self.assertTrue(payload["candidates"]["missing_data_candidates"])
             self.assertTrue(payload["candidates"]["web_imputation_candidates"])
             self.assertTrue(payload["candidates"]["pending_answer_synthesis"])
+            self.assertTrue(payload["issues"])
+            first_issue = payload["issues"][0]
+            self.assertIn("issue_id", first_issue)
+            self.assertIn("severity", first_issue)
+            self.assertIn("target_wikilinks", first_issue)
+            self.assertIn("suggested_action", first_issue)
 
     def test_write_semantic_candidates_outputs_json_and_markdown(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -115,6 +158,7 @@ class SemanticLintTests(unittest.TestCase):
 
             payload = json.loads(json_path.read_text(encoding="utf-8"))
             self.assertIn("candidates", payload)
+            self.assertIn("issues", payload)
             self.assertIn("# Semantic Lint Candidates", md_path.read_text(encoding="utf-8"))
 
 

@@ -53,6 +53,7 @@ class LintTests(unittest.TestCase):
             self.assertEqual(result["stats"].high_value_pending_answers, 1)
             self.assertTrue(any(issue.category == "pending answer worth filing" for issue in result["issues"]))
             self.assertGreaterEqual(result["health_score"], 0)
+            self.assertIn("semantic_queue", result)
             recommendation = result["pending_queue"][0]["recommendation"]
             self.assertEqual(recommendation["action"], "new")
             self.assertIn("python3 -m llm_notes.answers file", recommendation["command"])
@@ -69,7 +70,9 @@ class LintTests(unittest.TestCase):
             content = report_path.read_text(encoding="utf-8")
             self.assertIn("# KB Health Report", content)
             self.assertIn("## Answer Filing Queue", content)
+            self.assertIn("## Semantic Hotspots", content)
             self.assertIn("pending_queue", report)
+            self.assertIn("semantic_queue", report)
 
     def test_lint_fix_regenerates_indexes(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
