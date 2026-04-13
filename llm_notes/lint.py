@@ -4,13 +4,17 @@ from __future__ import annotations
 
 import argparse
 import json
-import shlex
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from typing import Any
 
-from llm_notes.answers import assess_answer_for_filing, list_answers, resolve_answer_sources
+from llm_notes.answers import (
+    assess_answer_for_filing,
+    filing_recommendation_for_answer,
+    list_answers,
+    resolve_answer_sources,
+)
 from llm_notes.compile import discover_sources, find_kb_root, sync_kb_indexes
 from llm_notes.wiki import article_inventory, list_articles, load_recent_entries
 
@@ -71,43 +75,6 @@ def _render_issue_block(issues: list[LintIssue], severity: str, title: str) -> l
         lines.append(f"- **{issue.category}** — {issue.message}")
     lines.append("")
     return lines
-
-
-def _shell_command(args: list[str]) -> str:
-    return " ".join(shlex.quote(arg) for arg in args)
-
-
-def _filing_recommendation(kb_root: Path, answer: Any, assessment: Any) -> dict[str, Any]:
-    args = [
-        "python3",
-        "-m",
-        "llm_notes.answers",
-        "file",
-        "--kb-root",
-        ".",
-        "--answer",
-        answer.rel_path,
-    ]
-    if assessment.action == "enrich":
-        args.extend(["--mode", "enrich"])
-        if assessment.candidate_article:
-            args.extend(["--article", assessment.candidate_article])
-    elif assessment.action == "new":
-        args.extend(["--mode", "new"])
-        args.extend(["--title", answer.title])
-    else:
-        args.extend(["--mode", "auto"])
-
-    return {
-        "answer_rel_path": answer.rel_path,
-        "question": answer.question,
-        "score": assessment.score,
-        "action": assessment.action,
-        "candidate_article": assessment.candidate_article,
-        "reasons": assessment.reasons,
-        "command_args": args,
-        "command": _shell_command(args),
-    }
 
 
 def _suggested_explorations(kb_root: str | Path, pending_queue: list[dict[str, Any]]) -> list[str]:
@@ -195,7 +162,7 @@ def run_lint(kb_root: str | Path, *, fix: bool = False) -> dict[str, Any]:
                 {
                     "answer": answer,
                     "assessment": assessment,
-                    "recommendation": _filing_recommendation(root, answer, assessment),
+                    "recommendation": filing_recommendation_for_answer(answer, assessment=assessment),
                 }
             )
             issues.append(

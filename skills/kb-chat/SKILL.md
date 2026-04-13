@@ -152,9 +152,12 @@ EOF
 python3 -m llm_notes.chat link-answer \
   --kb-root <kb-root> \
   --session <session rel_path or session_id> \
-  --answer outputs/answers/YYYY-MM-DD-slug.md \
-  --filed-wikilink category/article
+  --answer outputs/answers/YYYY-MM-DD-slug.md
 ```
+
+`link-answer` now inspects the answer note itself:
+- if the answer was already filed, it registers the filed wikilinks back onto the session automatically
+- if the answer is still pending but the filing model recommends `new` or `enrich`, it writes that recommendation and exact command into the session's `Promotion Queue`
 
 Promote when the insight is reusable. Do not promote transient chatter or purely operational turns.
 

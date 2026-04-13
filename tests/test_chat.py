@@ -8,6 +8,7 @@ import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
 
+from llm_notes.answers import save_answer
 from llm_notes.chat import (
     append_chat_turn,
     close_chat_session,
@@ -98,6 +99,49 @@ class ChatTests(unittest.TestCase):
             self.assertIn("Answer note: `outputs/answers/2026-04-12-answer.md`", session.body)
             self.assertIn("Filed to wiki: [[ml/attention]]", session.body)
 
+    def test_register_chat_artifacts_adds_promotion_queue_for_pending_answer(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            kb_root = Path(tmpdir)
+            wiki_dir = kb_root / "wiki" / "ml"
+            wiki_dir.mkdir(parents=True)
+            (kb_root / "notes.md").write_text("# Notes\n\nBody", encoding="utf-8")
+            (wiki_dir / "attention.md").write_text(
+                "---\n"
+                'title: "Attention"\n'
+                "created: 2026-04-11\n"
+                "updated: 2026-04-11\n"
+                "sources:\n"
+                "  - notes.md\n"
+                "tags: [attention]\n"
+                "---\n\n"
+                "## Summary\n\nBody\n",
+                encoding="utf-8",
+            )
+            answer_path = save_answer(
+                kb_root,
+                question="What belongs on the attention page?",
+                body="# Extend\n\n## Main Conclusion\n\nAdd tradeoffs.\n",
+                sources_consulted=["wiki/ml/attention.md"],
+                metadata={"promotion_mode": "enrich", "promotion_targets": ["ml/attention"]},
+            )
+            session_path = create_chat_session(
+                kb_root,
+                title="Attention Session",
+                created_at="2026-04-12T09:00:00",
+            )
+
+            register_chat_artifacts(
+                kb_root,
+                session_path=session_path,
+                answer_paths=[answer_path],
+                updated_at="2026-04-12T09:10:00",
+            )
+
+            session = parse_chat_session(session_path, kb_root)
+            self.assertIn("## Promotion Queue", session.body)
+            self.assertIn("recommend `enrich`", session.body)
+            self.assertIn("python3 -m llm_notes.answers file", session.body)
+
     def test_list_chat_sessions_filters_by_status(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             kb_root = Path(tmpdir)
@@ -169,6 +213,56 @@ class ChatTests(unittest.TestCase):
             append_payload = json.loads(append_buffer.getvalue())
             self.assertEqual(exit_code, 0)
             self.assertEqual(append_payload["turn_count"], 1)
+
+    def test_main_link_answer_emits_pending_recommendations(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            kb_root = Path(tmpdir)
+            wiki_dir = kb_root / "wiki" / "ml"
+            wiki_dir.mkdir(parents=True)
+            (kb_root / "notes.md").write_text("# Notes\n\nBody", encoding="utf-8")
+            (wiki_dir / "attention.md").write_text(
+                "---\n"
+                'title: "Attention"\n'
+                "created: 2026-04-11\n"
+                "updated: 2026-04-11\n"
+                "sources:\n"
+                "  - notes.md\n"
+                "tags: [attention]\n"
+                "---\n\n"
+                "## Summary\n\nBody\n",
+                encoding="utf-8",
+            )
+            answer_path = save_answer(
+                kb_root,
+                question="What belongs on the attention page?",
+                body="# Extend\n\n## Main Conclusion\n\nAdd tradeoffs.\n",
+                sources_consulted=["wiki/ml/attention.md"],
+                metadata={"promotion_mode": "enrich", "promotion_targets": ["ml/attention"]},
+            )
+            session_path = create_chat_session(
+                kb_root,
+                title="Attention Session",
+                created_at="2026-04-12T09:00:00",
+            )
+
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                exit_code = main(
+                    [
+                        "link-answer",
+                        "--kb-root",
+                        str(kb_root),
+                        "--session",
+                        str(session_path),
+                        "--answer",
+                        str(answer_path),
+                    ]
+                )
+
+            payload = json.loads(buffer.getvalue())
+            self.assertEqual(exit_code, 0)
+            self.assertTrue(payload["pending_recommendations"])
+            self.assertEqual(payload["pending_recommendations"][0]["action"], "enrich")
 
 
 if __name__ == "__main__":

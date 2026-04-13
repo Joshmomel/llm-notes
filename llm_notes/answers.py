@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -380,6 +381,44 @@ def assess_answer_for_filing(answer: AnswerNote) -> FilingAssessment:
         reasons=reasons or ["no strong filing signals"],
         candidate_article=candidate_article,
     )
+
+
+def filing_recommendation_for_answer(
+    answer: AnswerNote,
+    *,
+    assessment: FilingAssessment | None = None,
+) -> dict[str, Any] | None:
+    effective_assessment = assessment or assess_answer_for_filing(answer)
+    if not effective_assessment.should_file or effective_assessment.action not in {"new", "enrich"}:
+        return None
+
+    args = [
+        "python3",
+        "-m",
+        "llm_notes.answers",
+        "file",
+        "--kb-root",
+        ".",
+        "--answer",
+        answer.rel_path,
+    ]
+    if effective_assessment.action == "enrich":
+        args.extend(["--mode", "enrich"])
+        if effective_assessment.candidate_article:
+            args.extend(["--article", effective_assessment.candidate_article])
+    else:
+        args.extend(["--mode", "new", "--title", answer.title])
+
+    return {
+        "answer_rel_path": answer.rel_path,
+        "question": answer.question,
+        "score": effective_assessment.score,
+        "action": effective_assessment.action,
+        "candidate_article": effective_assessment.candidate_article,
+        "reasons": effective_assessment.reasons,
+        "command_args": args,
+        "command": " ".join(shlex.quote(arg) for arg in args),
+    }
 
 
 def _resolve_existing_path(kb_root: Path, reference: str) -> Path | None:

@@ -11,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from llm_notes.answers import assess_answer_for_filing, filing_recommendation_for_answer, parse_answer
 from llm_notes.compile import find_kb_root
 from llm_notes.wiki import parse_frontmatter, slugify
 
@@ -176,6 +177,8 @@ def _default_session_body(title: str, focus: str) -> str:
         "## Transcript\n\n"
         "## Session Outputs\n\n"
         "- Run `python3 -m llm_notes.answers finalize ...` when a stable synthesis emerges.\n\n"
+        "## Promotion Queue\n\n"
+        "- No pending promotions.\n\n"
         "## Emerging Insights\n\n"
         "- Capture durable takeaways worth filing back into the wiki.\n\n"
         "## Follow-up Questions\n\n"
@@ -320,6 +323,15 @@ def _merge_lists(existing: list[str], incoming: list[str]) -> list[str]:
     return merged
 
 
+def _recommendation_line(recommendation: dict[str, Any]) -> str:
+    answer_rel_path = recommendation["answer_rel_path"]
+    action = recommendation["action"]
+    command = recommendation["command"]
+    candidate = recommendation.get("candidate_article")
+    target = f" -> `{candidate}`" if candidate else ""
+    return f"`{answer_rel_path}` — recommend `{action}`{target} — command: `{command}`"
+
+
 def append_chat_turn(
     kb_root: str | Path,
     *,
@@ -363,6 +375,7 @@ def register_chat_artifacts(
     session = parse_chat_session(resolved, root)
 
     normalized_answers: list[str] = []
+    pending_recommendations: list[dict[str, Any]] = []
     for answer in _normalize_list(answer_paths):
         answer_path = Path(answer)
         if not answer_path.is_absolute():
@@ -372,6 +385,16 @@ def register_chat_artifacts(
             normalized_answers.append(_relative_to_root(answer_path, root))
 
     wikilinks = _normalize_list(filed_wikilinks)
+    for answer_rel_path in normalized_answers:
+        answer_note = parse_answer(root / answer_rel_path, root)
+        if answer_note.filed_to_wiki:
+            wikilinks = _merge_lists(wikilinks, answer_note.filed_wikilinks)
+            continue
+        assessment = assess_answer_for_filing(answer_note)
+        recommendation = filing_recommendation_for_answer(answer_note, assessment=assessment)
+        if recommendation is not None:
+            pending_recommendations.append(recommendation)
+
     metadata = dict(session.metadata)
     metadata["updated"] = updated_at or _now()
     metadata["answers_generated"] = _merge_lists(session.answers_generated, normalized_answers)
@@ -381,6 +404,16 @@ def register_chat_artifacts(
     output_items.extend(f"Filed to wiki: [[{wikilink}]]" for wikilink in wikilinks)
     section_items = _merge_lists(_section_bullets(session.body, "Session Outputs"), output_items)
     updated_body = _replace_section(session.body, "Session Outputs", "\n".join(f"- {item}" for item in section_items))
+
+    queue_items = [
+        item
+        for item in _section_bullets(updated_body, "Promotion Queue")
+        if item != "No pending promotions." and not any(answer_rel_path in item for answer_rel_path in normalized_answers)
+    ]
+    queue_items.extend(_recommendation_line(recommendation) for recommendation in pending_recommendations)
+    queue_content = "\n".join(f"- {item}" for item in queue_items) if queue_items else "- No pending promotions."
+    updated_body = _replace_section(updated_body, "Promotion Queue", queue_content)
+
     resolved.write_text(_serialize_session(metadata, updated_body), encoding="utf-8")
     return resolved
 
@@ -534,6 +567,17 @@ def main(argv: list[str] | None = None) -> int:
             updated_at=args.updated,
         )
         session = parse_chat_session(session_path, kb_root)
+        pending_recommendations = []
+        for answer_ref in _normalize_list(args.answer):
+            answer_note = parse_answer((kb_root / answer_ref) if not Path(answer_ref).is_absolute() else answer_ref, kb_root)
+            if answer_note.filed_to_wiki:
+                continue
+            recommendation = filing_recommendation_for_answer(
+                answer_note,
+                assessment=assess_answer_for_filing(answer_note),
+            )
+            if recommendation is not None:
+                pending_recommendations.append(recommendation)
         print(
             json.dumps(
                 {
@@ -541,6 +585,7 @@ def main(argv: list[str] | None = None) -> int:
                     "rel_path": session.rel_path,
                     "answers_generated": session.answers_generated,
                     "filed_wikilinks": session.filed_wikilinks,
+                    "pending_recommendations": pending_recommendations,
                 },
                 ensure_ascii=False,
                 indent=2,
