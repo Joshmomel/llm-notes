@@ -233,6 +233,7 @@ class AnswerTests(unittest.TestCase):
                 answer.retrieval_trace,
                 ["source:notes/retrieval.md#chunk-001", "wiki:ml/attention.md"],
             )
+            self.assertEqual(result["assessment"]["action"], "new")
             self.assertIsNotNone(result["filing_result"])
             self.assertIsNotNone(result["lint_result"])
             self.assertTrue((kb_root / "outputs" / "lint-report.md").exists())
@@ -255,9 +256,56 @@ class AnswerTests(unittest.TestCase):
             lint_state = run_lint(kb_root)
 
             self.assertFalse(answer.filed_to_wiki)
+            self.assertEqual(result["assessment"]["action"], "pending")
             self.assertIsNone(result["filing_result"])
             self.assertTrue((kb_root / "outputs" / "lint-report.md").exists())
             self.assertEqual(lint_state["stats"].pending_answers, 1)
+
+    def test_finalize_answer_auto_uses_enrich_recommendation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            kb_root = Path(tmpdir)
+            wiki_dir = kb_root / "wiki" / "ml"
+            wiki_dir.mkdir(parents=True)
+            (kb_root / "notes").mkdir()
+            (kb_root / "notes" / "attention.md").write_text("# Attention\n\nBody", encoding="utf-8")
+            article_path = wiki_dir / "attention.md"
+            article_path.write_text(
+                serialize_article(
+                    {
+                        "title": "Attention",
+                        "created": "2026-04-11",
+                        "updated": "2026-04-11",
+                        "sources": ["notes/attention.md"],
+                        "tags": ["attention"],
+                    },
+                    "## Summary\n\nAttention article.",
+                ),
+                encoding="utf-8",
+            )
+
+            result = finalize_answer(
+                kb_root,
+                question="What should be added to the attention page?",
+                body=(
+                    "# Extend attention\n\n"
+                    "## Main Conclusion\n\n"
+                    "The attention page should add a dense-vs-retrieval tradeoff section with explicit caveats.\n\n"
+                    "## Knowledge Network Extension\n\n"
+                    "- [[ml/attention]] — primary landing page for this synthesis.\n\n"
+                    "## Further Questions\n\n"
+                    "- Which workloads still favor dense attention?"
+                ),
+                sources_consulted=["wiki/ml/attention.md"],
+                metadata={"promotion_mode": "enrich", "promotion_targets": ["ml/attention"]},
+            )
+
+            updated = read_article(article_path, kb_root)
+            answer = parse_answer(result["answer_path"], kb_root)
+
+            self.assertEqual(result["assessment"]["action"], "enrich")
+            self.assertEqual(result["assessment"]["candidate_article"], "ml/attention")
+            self.assertTrue(answer.filed_to_wiki)
+            self.assertIn("## Filed Insights", updated.body)
 
 
 if __name__ == "__main__":

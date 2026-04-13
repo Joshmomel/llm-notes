@@ -65,6 +65,7 @@ python3 -m llm_notes.lint --kb-root <kb-root> --json
 ```
 
 Use the helper output and generated report as the primary health-check result instead of hand-assembling the report.
+The helper's JSON output now includes a structured `pending_queue` with executable filing recommendations.
 
 ### Step 3.5: Build Semantic Candidate Set
 
@@ -148,8 +149,10 @@ date: YYYY-MM-DD
 
 ## Answer Filing Queue
 
-- `outputs/answers/YYYY-MM-DD-slug.md` — score 0.80 — why it should be filed
+- `outputs/answers/YYYY-MM-DD-slug.md` — score 0.80 — recommend `enrich` or `new`
 - candidate target article if known
+- exact command to execute the recommendation, for example:
+  `python3 -m llm_notes.answers file --kb-root . --answer outputs/answers/YYYY-MM-DD-slug.md --mode enrich --article ml/attention`
 
 ## Auto-fixed
 
@@ -171,4 +174,5 @@ Print a brief summary to the user:
 - Number of high-value pending answers waiting to be filed
 - Number of semantic hotspot candidates generated
 - Top 3 suggested explorations
+- The top 1-3 executable filing recommendations from the queue
 - Note any auto-fixes that were applied

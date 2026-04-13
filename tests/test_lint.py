@@ -53,6 +53,9 @@ class LintTests(unittest.TestCase):
             self.assertEqual(result["stats"].high_value_pending_answers, 1)
             self.assertTrue(any(issue.category == "pending answer worth filing" for issue in result["issues"]))
             self.assertGreaterEqual(result["health_score"], 0)
+            recommendation = result["pending_queue"][0]["recommendation"]
+            self.assertEqual(recommendation["action"], "new")
+            self.assertIn("python3 -m llm_notes.answers file", recommendation["command"])
 
     def test_lint_report_writes_markdown_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -66,6 +69,7 @@ class LintTests(unittest.TestCase):
             content = report_path.read_text(encoding="utf-8")
             self.assertIn("# KB Health Report", content)
             self.assertIn("## Answer Filing Queue", content)
+            self.assertIn("pending_queue", report)
 
     def test_lint_fix_regenerates_indexes(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -125,6 +129,75 @@ class LintTests(unittest.TestCase):
 
             result = run_lint(kb_root)
             self.assertTrue(any(issue.category == "filed answer target missing" for issue in result["issues"]))
+
+    def test_lint_queues_explicit_enrich_recommendation_even_if_answer_is_short(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            kb_root = Path(tmpdir)
+            wiki_dir = kb_root / "wiki" / "ml"
+            wiki_dir.mkdir(parents=True)
+            (kb_root / "notes.md").write_text("# Notes\n\nBody", encoding="utf-8")
+            (wiki_dir / "attention.md").write_text(
+                serialize_article(
+                    {
+                        "title": "Attention",
+                        "created": "2026-04-11",
+                        "updated": "2026-04-11",
+                        "sources": ["notes.md"],
+                        "tags": ["attention"],
+                    },
+                    "## Summary\n\nBody",
+                ),
+                encoding="utf-8",
+            )
+
+            save_answer(
+                kb_root,
+                question="Extend the attention page?",
+                body="# Extend\n\n## Main Conclusion\n\nAdd retrieval caveats.",
+                sources_consulted=["wiki/ml/attention.md"],
+                metadata={"promotion_mode": "enrich", "promotion_targets": ["ml/attention"]},
+            )
+
+            result = run_lint(kb_root)
+            self.assertEqual(result["stats"].high_value_pending_answers, 1)
+            self.assertTrue(any("`enrich`" in issue.message for issue in result["issues"] if issue.category == "pending answer worth filing"))
+            recommendation = result["pending_queue"][0]["recommendation"]
+            self.assertEqual(recommendation["action"], "enrich")
+            self.assertEqual(recommendation["candidate_article"], "ml/attention")
+            self.assertIn("--article ml/attention", recommendation["command"])
+
+    def test_lint_report_includes_executable_command_for_queue_item(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            kb_root = Path(tmpdir)
+            wiki_dir = kb_root / "wiki" / "ml"
+            wiki_dir.mkdir(parents=True)
+            (kb_root / "notes.md").write_text("# Notes\n\nBody", encoding="utf-8")
+            (wiki_dir / "attention.md").write_text(
+                serialize_article(
+                    {
+                        "title": "Attention",
+                        "created": "2026-04-11",
+                        "updated": "2026-04-11",
+                        "sources": ["notes.md"],
+                        "tags": ["attention"],
+                    },
+                    "## Summary\n\nBody",
+                ),
+                encoding="utf-8",
+            )
+
+            save_answer(
+                kb_root,
+                question="What belongs on the attention page?",
+                body="# Extend\n\n## Main Conclusion\n\nAdd tradeoffs.\n",
+                sources_consulted=["wiki/ml/attention.md"],
+                metadata={"promotion_mode": "enrich", "promotion_targets": ["ml/attention"]},
+            )
+
+            report = write_report(kb_root)
+            content = (kb_root / report["rel_path"]).read_text(encoding="utf-8")
+            self.assertTrue(report["pending_queue"])
+            self.assertIn("Command: `python3 -m llm_notes.answers file", content)
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -72,13 +73,51 @@ def _render_issue_block(issues: list[LintIssue], severity: str, title: str) -> l
     return lines
 
 
+def _shell_command(args: list[str]) -> str:
+    return " ".join(shlex.quote(arg) for arg in args)
+
+
+def _filing_recommendation(kb_root: Path, answer: Any, assessment: Any) -> dict[str, Any]:
+    args = [
+        "python3",
+        "-m",
+        "llm_notes.answers",
+        "file",
+        "--kb-root",
+        ".",
+        "--answer",
+        answer.rel_path,
+    ]
+    if assessment.action == "enrich":
+        args.extend(["--mode", "enrich"])
+        if assessment.candidate_article:
+            args.extend(["--article", assessment.candidate_article])
+    elif assessment.action == "new":
+        args.extend(["--mode", "new"])
+        args.extend(["--title", answer.title])
+    else:
+        args.extend(["--mode", "auto"])
+
+    return {
+        "answer_rel_path": answer.rel_path,
+        "question": answer.question,
+        "score": assessment.score,
+        "action": assessment.action,
+        "candidate_article": assessment.candidate_article,
+        "reasons": assessment.reasons,
+        "command_args": args,
+        "command": _shell_command(args),
+    }
+
+
 def _suggested_explorations(kb_root: str | Path, pending_queue: list[dict[str, Any]]) -> list[str]:
     suggestions: list[str] = []
     for item in pending_queue[:5]:
         answer = item["answer"]
-        suggestion = f"{answer.question} — file `{answer.rel_path}` into the wiki"
-        if answer.promotion_targets:
-            suggestion += f" (candidate: `{answer.promotion_targets[0]}`)"
+        assessment = item["assessment"]
+        suggestion = f"{answer.question} — {assessment.action} `{answer.rel_path}`"
+        if assessment.candidate_article:
+            suggestion += f" (candidate: `{assessment.candidate_article}`)"
         suggestions.append(suggestion)
 
     if not suggestions:
@@ -152,12 +191,18 @@ def run_lint(kb_root: str | Path, *, fix: bool = False) -> dict[str, Any]:
             )
 
         if assessment.should_file:
-            pending_queue.append({"answer": answer, "assessment": assessment})
+            pending_queue.append(
+                {
+                    "answer": answer,
+                    "assessment": assessment,
+                    "recommendation": _filing_recommendation(root, answer, assessment),
+                }
+            )
             issues.append(
                 LintIssue(
                     "warning",
                     "pending answer worth filing",
-                    f"`{answer.rel_path}` scored {assessment.score:.2f} for filing ({'; '.join(assessment.reasons)})",
+                    f"`{answer.rel_path}` scored {assessment.score:.2f} for `{assessment.action}` ({'; '.join(assessment.reasons)})",
                 )
             )
         else:
@@ -242,10 +287,14 @@ def render_report(kb_root: str | Path, result: dict[str, Any]) -> str:
         for item in pending_queue:
             answer = item["answer"]
             assessment = item["assessment"]
-            lines.append(f"- `{answer.rel_path}` — score {assessment.score:.2f} — {answer.question}")
+            recommendation = item["recommendation"]
+            lines.append(
+                f"- `{answer.rel_path}` — score {assessment.score:.2f} — recommend `{assessment.action}` — {answer.question}"
+            )
             lines.append(f"  Reasons: {'; '.join(assessment.reasons)}")
-            if answer.promotion_targets:
-                lines.append(f"  Candidate target: `{answer.promotion_targets[0]}`")
+            if assessment.candidate_article:
+                lines.append(f"  Candidate target: `{assessment.candidate_article}`")
+            lines.append(f"  Command: `{recommendation['command']}`")
     else:
         lines.append("- No high-value pending answers.")
     lines.append("")
@@ -286,6 +335,10 @@ def write_report(kb_root: str | Path, *, fix: bool = False) -> dict[str, Any]:
             "pending_answers": result["stats"].pending_answers,
             "high_value_pending_answers": result["stats"].high_value_pending_answers,
         },
+        "pending_queue": [
+            item["recommendation"]
+            for item in result["pending_queue"]
+        ],
         "suggested_explorations": result["suggested_explorations"],
         "auto_fixed": result["auto_fixed"],
     }

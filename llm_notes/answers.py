@@ -108,8 +108,10 @@ class AnswerNote:
 @dataclass(frozen=True)
 class FilingAssessment:
     score: float
+    action: str
     should_file: bool
     reasons: list[str]
+    candidate_article: str | None = None
 
 
 def answers_root(kb_root: str | Path) -> Path:
@@ -313,7 +315,13 @@ def list_answers(kb_root: str | Path) -> list[AnswerNote]:
 
 def assess_answer_for_filing(answer: AnswerNote) -> FilingAssessment:
     if answer.filed_to_wiki:
-        return FilingAssessment(score=1.0, should_file=False, reasons=["already filed"])
+        return FilingAssessment(
+            score=1.0,
+            action="already_filed",
+            should_file=False,
+            reasons=["already filed"],
+            candidate_article=answer.filed_wikilinks[0] if answer.filed_wikilinks else None,
+        )
 
     score = 0.0
     reasons: list[str] = []
@@ -348,10 +356,29 @@ def assess_answer_for_filing(answer: AnswerNote) -> FilingAssessment:
         reasons.append("has destination candidate")
 
     final_score = min(round(score, 2), 1.0)
+    candidate_article = _auto_article_reference(answer)
+    if answer.promotion_mode == "enrich" and candidate_article:
+        action = "enrich"
+        reasons.append("explicit promotion_mode=enrich")
+    elif answer.promotion_mode == "new":
+        action = "new"
+        reasons.append("explicit promotion_mode=new")
+    elif final_score >= 0.55:
+        action = "enrich" if candidate_article else "new"
+        reasons.append(
+            "has destination candidate" if candidate_article else "high-value synthesis without destination candidate"
+        )
+    else:
+        action = "pending"
+
+    should_file = final_score >= 0.55 or answer.promotion_mode in {"enrich", "new"}
+
     return FilingAssessment(
         score=final_score,
-        should_file=final_score >= 0.55,
+        action=action,
+        should_file=should_file,
         reasons=reasons or ["no strong filing signals"],
+        candidate_article=candidate_article,
     )
 
 
@@ -596,11 +623,17 @@ def finalize_answer(
         or bool(answer.promotion_targets)
     )
     if should_attempt_file:
+        effective_mode = file_mode
+        effective_article = article
+        if file_mode == "auto" and assessment.action in {"new", "enrich"}:
+            effective_mode = assessment.action
+            if effective_mode == "enrich" and not effective_article:
+                effective_article = assessment.candidate_article
         filing_result = file_answer(
             root,
             answer_path=answer_path,
-            mode=file_mode,
-            article=article,
+            mode=effective_mode,
+            article=effective_article,
             title=title,
             category=category,
             slug=slug,
@@ -630,8 +663,10 @@ def finalize_answer(
         "filed_wikilinks": final_answer.filed_wikilinks,
         "assessment": {
             "score": assessment.score,
+            "action": assessment.action,
             "should_file": assessment.should_file,
             "reasons": assessment.reasons,
+            "candidate_article": assessment.candidate_article,
         },
         "filing_result": filing_result,
         "lint_result": lint_result,
