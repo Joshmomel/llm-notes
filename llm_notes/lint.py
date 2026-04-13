@@ -317,6 +317,9 @@ def write_report(kb_root: str | Path, *, fix: bool = False) -> dict[str, Any]:
     report_path = lint_report_path(root)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(render_report(root, result), encoding="utf-8")
+    from llm_notes.report import write_report as write_kb_report
+
+    kb_report = write_kb_report(root)
     return {
         "path": str(report_path),
         "rel_path": report_path.relative_to(root).as_posix(),
@@ -341,6 +344,8 @@ def write_report(kb_root: str | Path, *, fix: bool = False) -> dict[str, Any]:
         "semantic_candidate_counts": result["semantic_candidate_counts"],
         "suggested_explorations": result["suggested_explorations"],
         "auto_fixed": result["auto_fixed"],
+        "kb_report_path": kb_report["path"],
+        "kb_report_rel_path": kb_report["rel_path"],
     }
 
 

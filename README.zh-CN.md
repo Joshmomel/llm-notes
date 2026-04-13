@@ -144,6 +144,8 @@ your-kb/
 
 这使 `/kb-compile` 不只能判断“哪些源文件变了”，还可以进一步判断“哪些既有文章受影响”以及“默认应该新建或刷新哪篇文章”。
 
+`outputs/KB_REPORT.md` 是这个知识库的 dashboard 式首页。它会把当前快照、待 filing 的回答、semantic hotspots、活跃 session 和下一步建议统一汇总到一个文件里，便于人或 agent 先快速定向，再决定深入读取哪些细节文件。
+
 ## 仓库结构
 
 ```text

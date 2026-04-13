@@ -691,6 +691,10 @@ def finalize_answer(
 
         semantic_result = write_semantic_candidates(root)
 
+    from llm_notes.report import write_report as write_kb_report
+
+    kb_report = write_kb_report(root)
+
     final_answer = parse_answer(answer_path, root)
     return {
         "answer_path": str(answer_path),
@@ -710,6 +714,10 @@ def finalize_answer(
         "filing_result": filing_result,
         "lint_result": lint_result,
         "semantic_result": semantic_result,
+        "kb_report": {
+            "path": kb_report["path"],
+            "rel_path": kb_report["rel_path"],
+        },
     }
 
 

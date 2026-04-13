@@ -236,6 +236,8 @@ class AnswerTests(unittest.TestCase):
             self.assertEqual(result["assessment"]["action"], "new")
             self.assertIsNotNone(result["filing_result"])
             self.assertIsNotNone(result["lint_result"])
+            self.assertEqual(result["kb_report"]["rel_path"], "outputs/KB_REPORT.md")
+            self.assertTrue((kb_root / result["kb_report"]["rel_path"]).exists())
             self.assertTrue((kb_root / "outputs" / "lint-report.md").exists())
             self.assertEqual(lint_state["stats"].high_value_pending_answers, 0)
 
@@ -258,6 +260,8 @@ class AnswerTests(unittest.TestCase):
             self.assertFalse(answer.filed_to_wiki)
             self.assertEqual(result["assessment"]["action"], "pending")
             self.assertIsNone(result["filing_result"])
+            self.assertEqual(result["kb_report"]["rel_path"], "outputs/KB_REPORT.md")
+            self.assertTrue((kb_root / result["kb_report"]["rel_path"]).exists())
             self.assertTrue((kb_root / "outputs" / "lint-report.md").exists())
             self.assertEqual(lint_state["stats"].pending_answers, 1)
 
@@ -306,6 +310,7 @@ class AnswerTests(unittest.TestCase):
             self.assertEqual(result["assessment"]["candidate_article"], "ml/attention")
             self.assertTrue(answer.filed_to_wiki)
             self.assertIn("## Filed Insights", updated.body)
+            self.assertTrue((kb_root / result["kb_report"]["rel_path"]).exists())
 
 
 if __name__ == "__main__":

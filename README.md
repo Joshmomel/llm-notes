@@ -182,6 +182,8 @@ Important detail: in the current implementation, source files live directly in t
 
 That lets `/kb-compile` reason about not just which source files changed, but which existing articles are impacted and which new article targets are the default next step.
 
+`outputs/KB_REPORT.md` is the dashboard-style homepage for the KB. It rolls up the current snapshot, pending filing recommendations, semantic hotspots, active sessions, and next actions into one file so both humans and agents can orient quickly before reading deeper artifacts.
+
 ## Repository Layout
 
 ```text

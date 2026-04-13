@@ -70,6 +70,30 @@ class SemanticLintTests(unittest.TestCase):
                 ),
             )
             self._write_article(
+                wiki_dir / "attention-position.md",
+                title="Attention Position",
+                sources=["notes/attention.md", "notes/benchmark.md"],
+                tags=["attention", "long-context"],
+                body=(
+                    "## Summary\n\n"
+                    "Dense attention should be preferred for long-context serving because it is faster in this workload.\n\n"
+                    "## Open Questions\n\n"
+                    "- Which benchmark supports this preference?\n"
+                ),
+            )
+            self._write_article(
+                wiki_dir / "attention-counterpoint.md",
+                title="Attention Counterpoint",
+                sources=["notes/attention.md", "notes/benchmark.md"],
+                tags=["attention", "long-context"],
+                body=(
+                    "## Summary\n\n"
+                    "Dense attention should be avoided for long-context serving because it is slower in this workload.\n\n"
+                    "## Open Questions\n\n"
+                    "- Which benchmark contradicts the faster claim?\n"
+                ),
+            )
+            self._write_article(
                 wiki_dir / "attention-overview.md",
                 title="Attention",
                 sources=["notes/attention.md", "notes/benchmark.md"],
@@ -122,6 +146,7 @@ class SemanticLintTests(unittest.TestCase):
 
             self.assertTrue(payload["candidates"]["duplicate_candidates"])
             self.assertTrue(payload["candidates"]["split_candidates"])
+            self.assertTrue(payload["candidates"]["conflict_candidates"])
             self.assertTrue(payload["candidates"]["inconsistency_hotspots"])
             self.assertTrue(payload["candidates"]["connection_candidates"])
             self.assertTrue(payload["candidates"]["missing_data_candidates"])
@@ -160,6 +185,7 @@ class SemanticLintTests(unittest.TestCase):
             self.assertIn("candidates", payload)
             self.assertIn("issues", payload)
             self.assertIn("# Semantic Lint Candidates", md_path.read_text(encoding="utf-8"))
+            self.assertIn("## Conflict Candidates", md_path.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

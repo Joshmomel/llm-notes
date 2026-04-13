@@ -415,6 +415,9 @@ def register_chat_artifacts(
     updated_body = _replace_section(updated_body, "Promotion Queue", queue_content)
 
     resolved.write_text(_serialize_session(metadata, updated_body), encoding="utf-8")
+    from llm_notes.report import write_report as write_kb_report
+
+    write_kb_report(root)
     return resolved
 
 

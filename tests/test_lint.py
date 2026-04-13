@@ -73,6 +73,8 @@ class LintTests(unittest.TestCase):
             self.assertIn("## Semantic Hotspots", content)
             self.assertIn("pending_queue", report)
             self.assertIn("semantic_queue", report)
+            self.assertEqual(report["kb_report_rel_path"], "outputs/KB_REPORT.md")
+            self.assertTrue((kb_root / report["kb_report_rel_path"]).exists())
 
     def test_lint_fix_regenerates_indexes(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -98,6 +98,7 @@ class ChatTests(unittest.TestCase):
             self.assertEqual(session.filed_wikilinks, ["ml/attention"])
             self.assertIn("Answer note: `outputs/answers/2026-04-12-answer.md`", session.body)
             self.assertIn("Filed to wiki: [[ml/attention]]", session.body)
+            self.assertTrue((kb_root / "outputs" / "KB_REPORT.md").exists())
 
     def test_register_chat_artifacts_adds_promotion_queue_for_pending_answer(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -141,6 +142,7 @@ class ChatTests(unittest.TestCase):
             self.assertIn("## Promotion Queue", session.body)
             self.assertIn("recommend `enrich`", session.body)
             self.assertIn("python3 -m llm_notes.answers file", session.body)
+            self.assertTrue((kb_root / "outputs" / "KB_REPORT.md").exists())
 
     def test_list_chat_sessions_filters_by_status(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -263,6 +265,7 @@ class ChatTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertTrue(payload["pending_recommendations"])
             self.assertEqual(payload["pending_recommendations"][0]["action"], "enrich")
+            self.assertTrue((kb_root / "outputs" / "KB_REPORT.md").exists())
 
 
 if __name__ == "__main__":

@@ -159,6 +159,7 @@ date: YYYY-MM-DD
 
 - `duplicate_concept_candidate` / `merge_candidate` — overlapping wiki pages that likely describe the same concept
 - `split_candidate` — one article is trying to hold multiple article-sized topics
+- `conflict_candidate` — related pages that appear to make opposing recommendations or conclusions
 - `inconsistency_hotspot` — related articles whose claims or framing should be reviewed together
 - `connection_candidate` — related pages that probably need explicit wikilinks or a synthesis article
 - Each hotspot should include:

@@ -19,6 +19,16 @@ SEMANTIC_MD_RELATIVE_PATH = Path("outputs") / "lint-semantic-candidates.md"
 
 WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 SECTION_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+CONFLICT_CUE_PAIRS = [
+    ("prefer", "avoid"),
+    ("recommended", "not recommended"),
+    ("faster", "slower"),
+    ("better", "worse"),
+    ("increase", "decrease"),
+    ("cheaper", "expensive"),
+    ("efficient", "inefficient"),
+    ("stable", "fragile"),
+]
 
 
 def semantic_json_path(kb_root: str | Path) -> Path:
@@ -154,6 +164,7 @@ def _make_issue(
 
 def _article_snapshot(article: Article) -> dict[str, Any]:
     sections = _split_sections(article.body)
+    summary = sections.get("summary", "")
     related = sections.get("related", "")
     open_questions = sections.get("open questions", "")
     outgoing_links = sorted(set(_extract_wikilinks(article.body)))
@@ -169,6 +180,7 @@ def _article_snapshot(article: Article) -> dict[str, Any]:
         "outgoing_links": outgoing_links,
         "related_links": sorted(set(_extract_wikilinks(related))),
         "open_questions": _bulletize(open_questions),
+        "summary_text": summary.strip(),
         "body_preview": _preview(article.body),
         "body_length": len(article.body),
         "title_key": _normalize_title(article.title),
@@ -356,6 +368,74 @@ def _split_candidates(snapshots: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sorted(candidates, key=lambda item: (-item["score"], item["issue_id"]))[:15]
 
 
+def _cue_hits(text: str) -> set[str]:
+    lowered = text.lower()
+    hits: set[str] = set()
+    for left, right in CONFLICT_CUE_PAIRS:
+        if left in lowered:
+            hits.add(left)
+        if right in lowered:
+            hits.add(right)
+    return hits
+
+
+def _conflict_candidates(snapshots: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    candidates: list[dict[str, Any]] = []
+    for left, right in combinations(snapshots, 2):
+        shared_tags = sorted(set(left["tags"]) & set(right["tags"]))
+        shared_sources = sorted(set(left["sources"]) & set(right["sources"]))
+        same_category = bool(left["category"] and left["category"] == right["category"])
+        preview_overlap = _jaccard(set(left["body_tokens"]), set(right["body_tokens"]))
+
+        if not (shared_tags or shared_sources or same_category or preview_overlap >= 0.18):
+            continue
+
+        left_text = f"{left['summary_text']} {left['body_preview']}".strip()
+        right_text = f"{right['summary_text']} {right['body_preview']}".strip()
+        left_hits = _cue_hits(left_text)
+        right_hits = _cue_hits(right_text)
+
+        matched_pairs: list[str] = []
+        for positive, negative in CONFLICT_CUE_PAIRS:
+            if (positive in left_hits and negative in right_hits) or (negative in left_hits and positive in right_hits):
+                matched_pairs.append(f"{positive} vs {negative}")
+
+        if not matched_pairs:
+            continue
+
+        score = 0.25
+        reasons: list[str] = [f"opposing cues: {', '.join(matched_pairs)}"]
+        if shared_tags:
+            score += min(0.20, 0.08 * len(shared_tags))
+            reasons.append(f"shared tags: {', '.join(shared_tags)}")
+        if shared_sources:
+            score += min(0.25, 0.12 * len(shared_sources))
+            reasons.append(f"shared sources: {', '.join(shared_sources)}")
+        if same_category:
+            score += 0.10
+            reasons.append("same category")
+        if preview_overlap >= 0.18:
+            score += min(0.20, preview_overlap)
+            reasons.append(f"body overlap: {preview_overlap:.2f}")
+
+        candidates.append(
+            _make_issue(
+                kind="conflict_candidate",
+                score=score,
+                reason="; ".join(reasons),
+                target_wikilinks=[left["wikilink"], right["wikilink"]],
+                suggested_action="review_conflict",
+                left=left["wikilink"],
+                right=right["wikilink"],
+                shared_tags=shared_tags,
+                shared_sources=shared_sources,
+                cue_pairs=matched_pairs,
+            )
+        )
+
+    return sorted(candidates, key=lambda item: (-item["score"], item["issue_id"]))[:15]
+
+
 def _web_lookup_needed(question: str) -> bool:
     lowered = question.lower()
     triggers = (
@@ -457,6 +537,7 @@ def build_semantic_candidates(kb_root: str | Path) -> dict[str, Any]:
     candidate_groups = {
         "duplicate_candidates": _duplicate_overlap_candidates(snapshots),
         "split_candidates": _split_candidates(snapshots),
+        "conflict_candidates": _conflict_candidates(snapshots),
         "inconsistency_hotspots": _inconsistency_candidates(snapshots),
         "connection_candidates": _connection_candidates(snapshots),
         "missing_data_candidates": _missing_data_candidates(snapshots),
@@ -514,6 +595,17 @@ def render_semantic_candidates_markdown(payload: dict[str, Any]) -> str:
     else:
         lines.append("- None.")
 
+    lines.extend(["", "## Conflict Candidates", ""])
+    conflict_candidates = candidates["conflict_candidates"]
+    if conflict_candidates:
+        for item in conflict_candidates:
+            lines.append(
+                f"- `{item['target_wikilinks'][0]}` vs `{item['target_wikilinks'][1]}` — "
+                f"score {item['score']:.2f} — {item['reason']}"
+            )
+    else:
+        lines.append("- None.")
+
     lines.extend(["", "## Inconsistency Hotspots", ""])
     hotspots = candidates["inconsistency_hotspots"]
     if hotspots:
@@ -568,6 +660,7 @@ def render_semantic_candidates_markdown(payload: dict[str, Any]) -> str:
             "## Agent Instructions",
             "",
             "- Review duplicate/merge candidates first to eliminate overlapping articles before deep semantic cleanup.",
+            "- Review conflict candidates before assuming two similar articles can be merged safely.",
             "- Review the top inconsistency hotspots and cite the exact conflicting claims if any.",
             "- For split candidates, decide whether one article should become several narrower pages.",
             "- For connection candidates, decide whether the wiki should add mutual wikilinks or a new synthesis article.",
