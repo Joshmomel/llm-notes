@@ -18,6 +18,7 @@
 | 命令            | 作用                                                                              |
 | ------------- | ------------------------------------------------------------------------------- |
 | `/kb-init`    | 初始化知识库目录，创建 `wiki/`、`outputs/`、`CLAUDE.md` 和基础索引；如果目录已有内容，会自动编译现有材料             |
+| `/kb-ingest`  | 通过统一的 `add` 入口把外部材料导入知识库：可将网页抓取到 `imports/web/`，将本地文件复制到 `imports/files/`，或把粘贴文本保存到 `imports/text/` |
 | `/kb-compile` | 读取知识库根目录中的源材料，先计算确定性的 source/article 编译计划，再生成或更新结构化 wiki 文章，并维护 `_index.md`、`_glossary.md`、`_recent.md` |
 | `/kb-chat`    | 开启多轮 KB 对话，把完整对话轨迹保存到 `outputs/sessions/`，在同一会话里承接 follow-up，并把稳定结论沉淀回答案或 wiki |
 | `/kb-qa`      | 基于现有 wiki 回答问题，需要时同时利用编译后的 wiki 与原始 source 的双层检索，并沿相关概念延伸知识网络；将答案保存到 `outputs/answers/`，并可选择回填到 wiki |
@@ -65,6 +66,7 @@ cd llm-notes
 ```bash
 # 在 Claude Code 中
 /kb-init .
+/kb-ingest "https://example.com/article"
 /kb-chat "先梳理这个知识库的主线，并把 follow-up 放进同一会话"
 /kb-qa "这个知识库里有哪些主要主题？"
 /kb-lint
@@ -76,6 +78,10 @@ cd llm-notes
 
 ```bash
 # 在 Claude Code 中
+# 将笔记、代码、PDF、图片或其他源文件放入当前目录
+# 或直接导入：
+/kb-ingest "https://example.com/article"
+pbpaste | /kb-ingest --title "Copied note"
 /kb-compile
 /kb-qa "目前已经整理出了哪些关键概念？"
 ```
@@ -121,6 +127,10 @@ cd llm-notes
 your-kb/
 ├── CLAUDE.md             # 该知识库的 LLM 操作说明
 ├── <source files...>     # 权威源材料保留在知识库根目录
+├── imports/
+│   ├── files/
+│   ├── text/
+│   └── web/
 ├── wiki/
 │   ├── _index.md
 │   ├── _glossary.md
@@ -146,6 +156,9 @@ your-kb/
 
 `outputs/KB_REPORT.md` 是这个知识库的 dashboard 式首页。它会把当前快照、待 filing 的回答、semantic hotspots、活跃 session 和下一步建议统一汇总到一个文件里，便于人或 agent 先快速定向，再决定深入读取哪些细节文件。
 
+`/kb-ingest` 是一个可选的入口层，用来把外部材料标准化地导入到 `imports/`。它不会取代当前“KB 根目录即 source root”的模型，只是让 URL、本地文件和粘贴文本进入知识库时有一条统一的路径。
+在交互式 agent 工作流里，导入和编译不一定要绑定成一步：执行 `/kb-ingest` 之后，通常更适合让助手追问一句是否立刻运行 `/kb-compile`。
+
 ## 仓库结构
 
 ```text
@@ -157,6 +170,7 @@ llm-notes/
 │   ├── search.py
 │   └── wiki.py
 ├── skills/
+│   ├── kb-ingest/
 │   ├── kb-chat/
 │   ├── kb-init/
 │   ├── kb-compile/

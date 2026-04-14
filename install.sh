@@ -1,6 +1,6 @@
 #!/bin/bash
 # Install llm-notes skills globally for Claude Code
-# After install, use /kb-init, /kb-compile, /kb-qa, /kb-chat, /kb-lint, /kb-slides, /kb-viz, /kb-search from any directory
+# After install, use /kb-init, /kb-ingest, /kb-compile, /kb-qa, /kb-chat, /kb-lint, /kb-slides, /kb-viz, /kb-search from any directory
 
 set -e
 
@@ -10,7 +10,7 @@ PYTHON_BIN="${PYTHON_BIN:-python3}"
 
 mkdir -p "$SKILLS_DIR"
 
-for skill in kb-init kb-compile kb-qa kb-chat kb-lint kb-slides kb-viz kb-search; do
+for skill in kb-init kb-ingest kb-compile kb-qa kb-chat kb-lint kb-slides kb-viz kb-search; do
   ln -sfn "$SCRIPT_DIR/skills/$skill" "$SKILLS_DIR/$skill"
   echo "Installed /$skill"
 done

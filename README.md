@@ -18,6 +18,7 @@ Unlike workflows that require a `raw/` + `wiki/` layout, the current implementat
 | Command       | Purpose                                                                                                                                                                         |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/kb-init`    | Initialize a knowledge base directory, create `wiki/`, `outputs/`, `CLAUDE.md`, and starter indexes, and auto-compile existing material when present                            |
+| `/kb-ingest`  | Import external material into the KB through one `add` entrypoint: fetch web pages into `imports/web/`, copy local files into `imports/files/`, or save pasted text into `imports/text/` |
 | `/kb-compile` | Read source material from the KB root, compute a deterministic source/article plan, create or update structured wiki articles, and maintain `_index.md`, `_glossary.md`, and `_recent.md` |
 | `/kb-chat`    | Run a multi-turn KB conversation, keep the transcript in `outputs/sessions/`, continue follow-up questions inside one session, and promote stable conclusions into answers/wiki |
 | `/kb-qa`      | Answer questions against the wiki, use dual-layer retrieval across both the compiled wiki and raw source files when needed, extend the local knowledge network through related concepts, save answers to `outputs/answers/`, and optionally file insights back into the wiki |
@@ -65,6 +66,7 @@ After installation, open any directory you want to use as a knowledge base in Cl
 ```bash
 # inside Claude Code
 /kb-init .
+/kb-ingest "https://example.com/article"
 /kb-chat "Let's explore the main themes here and keep the follow-ups in one session"
 /kb-qa "What are the main themes in this knowledge base?"
 /kb-lint
@@ -101,6 +103,10 @@ Use this when you want to build a new knowledge base from scratch:
 # inside Claude Code
 /kb-init .
 # add notes, code, PDFs, images, or other source files into this directory
+# or import them directly:
+/kb-ingest "https://example.com/article"
+# or paste text directly:
+pbpaste | /kb-ingest --title "Copied note"
 /kb-compile
 /kb-qa "What topics have emerged in the knowledge base so far?"
 ```
@@ -145,6 +151,7 @@ A complete workflow combining all skills:
 
 ```bash
 /kb-init .                           # Initialize and auto-compile
+/kb-ingest "https://example.com/article"  # Bring a web article into imports/web/
 /kb-chat "Work through the open research questions"  # Keep a transcript-backed session
 /kb-qa "What are the key findings?"  # Ask questions, file answers back
 /kb-slides "Summary of findings"     # Generate a presentation
@@ -159,6 +166,10 @@ A complete workflow combining all skills:
 your-kb/
 ├── CLAUDE.md             # LLM operating instructions for this KB
 ├── <source files...>     # Canonical source material stays in the KB root
+├── imports/
+│   ├── files/
+│   ├── text/
+│   └── web/
 ├── wiki/
 │   ├── _index.md
 │   ├── _glossary.md
@@ -184,6 +195,9 @@ That lets `/kb-compile` reason about not just which source files changed, but wh
 
 `outputs/KB_REPORT.md` is the dashboard-style homepage for the KB. It rolls up the current snapshot, pending filing recommendations, semantic hotspots, active sessions, and next actions into one file so both humans and agents can orient quickly before reading deeper artifacts.
 
+`/kb-ingest` is the optional front door for external material. It does not replace the current source-root model; it just gives you a standardized way to bring URLs, local files, or pasted text into the KB under `imports/` before compiling them.
+In interactive agent workflows, importing and compiling do not have to be the same step: after `/kb-ingest`, it is usually better for the assistant to ask whether it should run `/kb-compile` now.
+
 ## Repository Layout
 
 ```text
@@ -195,6 +209,7 @@ llm-notes/
 │   ├── search.py
 │   └── wiki.py
 ├── skills/
+│   ├── kb-ingest/
 │   ├── kb-chat/
 │   ├── kb-init/
 │   ├── kb-compile/
