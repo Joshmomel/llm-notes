@@ -116,7 +116,7 @@ python3 -m llm_notes.answers finalize \
   --question "<stable question distilled from the session>" \
   --source-consulted wiki/category/article.md \
   --source-consulted wiki/category/other-article.md \
-  --mode auto \
+  --no-auto-file \
   --body-stdin <<'EOF'
 # <Distilled Question>
 
@@ -159,7 +159,10 @@ python3 -m llm_notes.chat link-answer \
 - if the answer was already filed, it registers the filed wikilinks back onto the session automatically
 - if the answer is still pending but the filing model recommends `new` or `enrich`, it writes that recommendation and exact command into the session's `Promotion Queue`
 
-Promote when the insight is reusable. Do not promote transient chatter or purely operational turns.
+3. In interactive assistant workflows, use the session's promotion queue to ask before filing:
+- `Saved the distilled answer and added a promotion recommendation to the session. Do you want me to file it into the wiki now?`
+
+Promote when the insight is reusable. Do not promote transient chatter or purely operational turns. Only skip the confirmation step when the user explicitly asked to file the conclusion back into the wiki as part of this turn.
 
 ### Step 7: Close The Session
 

@@ -20,7 +20,7 @@ Unlike workflows that require a `raw/` + `wiki/` layout, the current implementat
 | `/kb-init`    | Initialize a knowledge base directory, create `wiki/`, `outputs/`, `CLAUDE.md`, and starter indexes, and auto-compile existing material when present                            |
 | `/kb-ingest`  | Import external material into the KB through one `add` entrypoint: fetch web pages into `imports/web/`, copy local files into `imports/files/`, or save pasted text into `imports/text/` |
 | `/kb-compile` | Read source material from the KB root, compute a deterministic source/article plan, create or update structured wiki articles, and maintain `_index.md`, `_glossary.md`, and `_recent.md` |
-| `/kb-chat`    | Run a multi-turn KB conversation, keep the transcript in `outputs/sessions/`, continue follow-up questions inside one session, and promote stable conclusions into answers/wiki |
+| `/kb-chat`    | Run a multi-turn KB conversation, keep the transcript in `outputs/sessions/`, continue follow-up questions inside one session, and stage stable conclusions for filing into answers/wiki |
 | `/kb-qa`      | Answer questions against the wiki, use dual-layer retrieval across both the compiled wiki and raw source files when needed, extend the local knowledge network through related concepts, save answers to `outputs/answers/`, and optionally file insights back into the wiki |
 | `/kb-lint`    | Run health checks, identify orphan articles, broken wikilinks, stale content, and uncovered sources, save a report to `outputs/lint-report.md`, and auto-fix safe issues        |
 | `/kb-slides`  | Generate Marp-format slide decks from wiki content, save to `outputs/slides/`, viewable in Obsidian with the Marp plugin                                                       |
@@ -118,7 +118,8 @@ Use this when you expect multiple follow-up questions on the same topic:
 ```bash
 /kb-chat "Compare dense attention and retrieval here"
 # -> transcript accumulates in outputs/sessions/YYYY-MM-DD-*.md
-# -> stable conclusions can still be distilled into outputs/answers/ and filed back into wiki/
+# -> stable conclusions can still be distilled into outputs/answers/
+# -> the assistant can then ask whether it should file them back into wiki/
 ```
 
 ### Generate Slides From Wiki Content

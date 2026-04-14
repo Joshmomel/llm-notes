@@ -20,7 +20,7 @@
 | `/kb-init`    | 初始化知识库目录，创建 `wiki/`、`outputs/`、`CLAUDE.md` 和基础索引；如果目录已有内容，会自动编译现有材料             |
 | `/kb-ingest`  | 通过统一的 `add` 入口把外部材料导入知识库：可将网页抓取到 `imports/web/`，将本地文件复制到 `imports/files/`，或把粘贴文本保存到 `imports/text/` |
 | `/kb-compile` | 读取知识库根目录中的源材料，先计算确定性的 source/article 编译计划，再生成或更新结构化 wiki 文章，并维护 `_index.md`、`_glossary.md`、`_recent.md` |
-| `/kb-chat`    | 开启多轮 KB 对话，把完整对话轨迹保存到 `outputs/sessions/`，在同一会话里承接 follow-up，并把稳定结论沉淀回答案或 wiki |
+| `/kb-chat`    | 开启多轮 KB 对话，把完整对话轨迹保存到 `outputs/sessions/`，在同一会话里承接 follow-up，并把稳定结论沉淀成待 filing 的 answer/wiki 产物 |
 | `/kb-qa`      | 基于现有 wiki 回答问题，需要时同时利用编译后的 wiki 与原始 source 的双层检索，并沿相关概念延伸知识网络；将答案保存到 `outputs/answers/`，并可选择回填到 wiki |
 | `/kb-lint`    | 执行健康检查，识别孤立文章、失效 wikilinks、过时内容和未覆盖源文件，将报告保存到 `outputs/lint-report.md`，并自动修复安全项 |
 | `/kb-slides`  | 基于 wiki 内容生成 Marp 幻灯片，保存到 `outputs/slides/`，可在 Obsidian 中配合 Marp 插件查看 |

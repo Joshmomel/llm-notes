@@ -143,7 +143,7 @@ python3 -m llm_notes.answers finalize \
   --retrieval-trace source:notes/source-file.md#chunk-001 \
   --source-consulted wiki/category/article.md \
   --source-consulted wiki/category/other-article.md \
-  --mode auto \
+  --no-auto-file \
   --body-stdin <<'EOF'
 # <Question>
 
@@ -175,11 +175,16 @@ EOF
 
 If you used the retrieval helper, carry the **actual mode you ended up relying on** into `--retrieval-mode`, not just the helper's suggestion. Then pass `sources_consulted_by_mode[<actual_mode>]` as the canonical `--source-consulted` list. This gives the KB an audit trail for whether the answer depended mainly on compiled wiki context, raw source reads, or both.
 
-Default behavior: `finalize` saves the answer note into `outputs/answers/`, auto-files reusable synthesis when appropriate, and refreshes `outputs/lint-report.md`.
+In interactive Claude Code / Codex flows, prefer `--no-auto-file` first:
+- save the answer note into `outputs/answers/`
+- refresh lint state
+- then decide with the user whether to file now
+
+Use automatic filing immediately only when the user explicitly asked to file back into the wiki as part of this turn.
 
 ### Step 5: Offer to File Back
 
-If you cannot use `finalize`, then decide manually whether the saved answer should be promoted into the wiki:
+After saving the answer note, decide whether it should be promoted into the wiki:
 
 - Auto-file by default when the answer is clearly reusable synthesis:
   - it combines 2 or more sources
@@ -189,7 +194,8 @@ If you cannot use `finalize`, then decide manually whether the saved answer shou
   - one-off operational answers
   - short fact lookups
   - answers that mostly repeat one existing article
-- If the destination article is ambiguous or filing would be risky, ask the user before filing.
+- In interactive assistant workflows, if filing would change the wiki and the user did not explicitly ask for that, ask a short follow-up first:
+  - `Saved to outputs/answers/... Do you want me to file it into the wiki now?`
 
 Manual filing helper:
 
