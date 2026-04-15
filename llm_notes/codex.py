@@ -19,7 +19,8 @@ Rules:
 - Start with `outputs/KB_REPORT.md` for the current dashboard before diving into individual wiki, answer, or session files.
 - For knowledge-oriented questions, prefer the single-step finisher: `python3 -m llm_notes.answers finalize --kb-root . ...`.
 - For multi-turn KB discussions, keep a transcript in `outputs/sessions/` with `python3 -m llm_notes.chat ...`.
-- `finalize` saves the answer note, auto-files reusable synthesis, and refreshes `outputs/lint-report.md`.
+- In interactive flows, prefer saving answers first and then asking before filing them into the wiki unless the user explicitly asked for immediate filing.
+- `finalize` saves the answer note and refreshes `outputs/lint-report.md`; filing into the wiki can happen in the same turn or after confirmation.
 - Treat `outputs/answers/` and `outputs/sessions/` as audit layers, not as canonical source material. When filing back into the wiki, prefer canonical source files and existing wiki articles.
 - Refresh the dashboard with `python3 -m llm_notes.report --kb-root .` when you need an updated KB-wide snapshot.
 - If a pending answer still needs semantic review, refresh the semantic shortlist with `python3 -m llm_notes.semantic_lint --kb-root .`.
@@ -30,7 +31,7 @@ _HOOK_CONTEXT = (
     "outputs/answers with `python3 -m llm_notes.answers finalize`, and keep multi-turn KB chats in "
     "outputs/sessions with `python3 -m llm_notes.chat`. Start by reading outputs/KB_REPORT.md for the "
     "current dashboard, and refresh it with `python3 -m llm_notes.report --kb-root .` when needed. "
-    "Finalize also auto-files reusable synthesis and refreshes lint state. Prefer canonical sources over outputs when updating the wiki."
+    "In interactive flows, prefer saving first and then asking before filing into the wiki unless the user explicitly requested immediate filing. Prefer canonical sources over outputs when updating the wiki."
 )
 
 _CODEX_HOOK = {
@@ -43,7 +44,7 @@ _CODEX_HOOK = {
                         "type": "command",
                         "command": (
                             "[ -d wiki ] && "
-                            + r"""echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"},"systemMessage":"llm-notes: This is a knowledge-base repo. Start by reading outputs/KB_REPORT.md for the current dashboard. For knowledge-oriented work, save answers to outputs/answers with `python3 -m llm_notes.answers finalize`, and keep multi-turn KB chats in outputs/sessions with `python3 -m llm_notes.chat`. Refresh the dashboard with `python3 -m llm_notes.report --kb-root .` when needed. Finalize also auto-files reusable synthesis and refreshes lint state. Prefer canonical sources over outputs when updating the wiki."}' """
+                            + r"""echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"},"systemMessage":"llm-notes: This is a knowledge-base repo. Start by reading outputs/KB_REPORT.md for the current dashboard. For knowledge-oriented work, save answers to outputs/answers with `python3 -m llm_notes.answers finalize`, and keep multi-turn KB chats in outputs/sessions with `python3 -m llm_notes.chat`. Refresh the dashboard with `python3 -m llm_notes.report --kb-root .` when needed. In interactive flows, prefer saving first and then asking before filing into the wiki unless the user explicitly requested immediate filing. Prefer canonical sources over outputs when updating the wiki."}' """
                             + "|| true"
                         ),
                     }
